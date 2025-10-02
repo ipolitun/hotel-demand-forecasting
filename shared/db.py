@@ -1,40 +1,47 @@
-# shared/db.py
+import os
+from dotenv import load_dotenv
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy.ext.declarative import DeclarativeMeta
-from sqlalchemy.pool import NullPool  # или другой, в зависимости от среды
-from dotenv import load_dotenv
-import os
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 load_dotenv()
 
+# Конфигурация подключения к БД
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_HOST = os.getenv("DB_HOST", "db")
-DB_PORT = os.getenv("DB_PORT")
+DB_PORT = os.getenv("DB_PORT", "5432")
 DB_NAME = os.getenv("DB_NAME")
 
-# Получаем URL из переменных среды (или .env)
-DB_URL=f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-
-# Создаём engine
-engine = create_engine(DB_URL, poolclass=NullPool)
-
-# Создаём фабрику сессий
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+DB_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+ASYNC_DB_URL = DB_URL.replace("postgresql://", "postgresql+asyncpg://")
 
 # Базовый класс моделей
-Base: DeclarativeMeta = declarative_base()
+Base = declarative_base()
 
+# Синхронное подключение
+engine = create_engine(DB_URL, echo=False, future=True)
+SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
-# Dependency — для FastAPI маршрутов
-def get_session():
+def get_session_sync():
+    """Dependency для FastAPI (sync)."""
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
 
-def get_session_sync():
-    return next(get_session())
+# Асинхронное подключение
+async_engine = create_async_engine(ASYNC_DB_URL, echo=False, future=True)
+AsyncSessionLocal = sessionmaker(bind=async_engine, class_=AsyncSession, expire_on_commit=False)
+
+async def get_async_session():
+    """Dependency для FastAPI (async)."""
+    async with AsyncSessionLocal() as session:
+        yield session
+
+async def init_models():
+    """Создание всех таблиц в БД (async)."""
+    async with async_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
