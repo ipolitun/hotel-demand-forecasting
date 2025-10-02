@@ -1,10 +1,12 @@
 import logging
 from fastapi import FastAPI, Header, HTTPException, Depends
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 
-from auth_service.db import get_session, SCHEDULER_KEY
-from auth_service.model_hotel_db import Hotel
+from shared.db import get_async_session
+from shared.models import Hotel
+from auth_service.config import SCHEDULER_KEY
 from auth_service.utils import create_access_token
 
 logger = logging.getLogger(__name__)
@@ -18,20 +20,20 @@ class TokenResponse(BaseModel):
 
 
 @app.get("/")
-def root():
+async def root():
     return {"message": "AUTH_SERVICE работает!"}
 
 
 @app.post("/token/system", response_model=TokenResponse)
-def generate_system_token(
-    x_system_key: str = Header(default=None)
+async def generate_system_token(
+    x_system_key: str = Header(..., alias="X-System-Key")
 ):
     """
     Генерация токена для системного планировщика.
     """
-    if not x_system_key or x_system_key != SCHEDULER_KEY:
-        logger.warning("Неверная попытка авторизации системным ключом")
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+    if x_system_key != SCHEDULER_KEY:
+        logger.warning("Неверный системный ключ")
+        raise HTTPException(status_code=401, detail="Invalid system key")
 
     payload = {"sub": "scheduler", "role": "scheduler"}
     token = create_access_token(payload)
@@ -39,20 +41,19 @@ def generate_system_token(
 
 
 @app.post("/token/user", response_model=TokenResponse)
-def generate_user_token(
-    x_api_key: str = Header(default=None),
-    db: Session = Depends(get_session)
+async def generate_user_token(
+    x_api_key: str = Header(..., alias="X-API-Key"),
+    db: AsyncSession = Depends(get_async_session),
 ):
     """
     Генерация токена для отеля по API-ключу.
     """
-    if not x_api_key:
-        raise HTTPException(status_code=400, detail="API key required")
+    result = await db.execute(select(Hotel).where(Hotel.api_key == x_api_key))
+    hotel = result.scalars().first()
 
-    hotel = db.query(Hotel).filter(Hotel.api_key == x_api_key).first()
     if not hotel:
-        logger.warning("Попытка входа с неверным API ключом")
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        logger.warning("Попытка входа с неверным API ключом: %s", x_api_key)
+        raise HTTPException(status_code=401, detail="Invalid API key")
 
     payload = {"sub": str(hotel.id), "role": "user", "hotel_id": hotel.id}
     token = create_access_token(payload)
