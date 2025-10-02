@@ -21,7 +21,7 @@ class TokenResponse(BaseModel):
 
 @app.get("/")
 async def root():
-    return {"message": "AUTH_SERVICE работает!"}
+    return {"message": "AUTH_SERVICE is running"}
 
 
 @app.post("/token/system", response_model=TokenResponse)
