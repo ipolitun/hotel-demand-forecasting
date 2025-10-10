@@ -7,7 +7,6 @@ RUN apt-get update && apt-get install -y gcc g++ python3-dev libffi-dev
 COPY ./data_interface_service/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-
 COPY ./data_interface_service /app/data_interface_service
 COPY ./shared /app/shared
 COPY ./database /app/database
