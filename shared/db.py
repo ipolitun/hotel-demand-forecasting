@@ -24,7 +24,7 @@ Base = declarative_base()
 engine = create_engine(DB_URL, echo=False, future=True)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
-def get_session_sync():
+def get_sync_session():
     """Dependency для FastAPI (sync)."""
     db = SessionLocal()
     try:

@@ -3,7 +3,7 @@ import secrets
 from fastapi import Header, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from shared.db import get_session
+from shared.db import get_sync_session
 from shared.models import Hotel
 
 def create_hotel(name: str, is_city_hotel: bool, db: Session) -> str:
@@ -20,7 +20,7 @@ def create_hotel(name: str, is_city_hotel: bool, db: Session) -> str:
 
 def get_hotel_by_key(
     x_api_key: str = Header(...),
-    db: Session = Depends(get_session)
+    db: Session = Depends(get_sync_session)
 ) -> Hotel:
     hotel = db.query(Hotel).filter(Hotel.api_key == x_api_key).first()
     if not hotel:

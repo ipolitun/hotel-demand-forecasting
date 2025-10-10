@@ -12,7 +12,7 @@ from prediction_service.schemas import (
     PredictRequest, PredictResponse
 )
 from prediction_service.config import MODEL_DIR
-from shared.db import get_session
+from shared.db import get_sync_session
 from shared.models import Prediction
 
 logger = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ app = FastAPI(title="Prediction Service API")
 
 
 @app.post("/run-predict", response_model=PredictResponse)
-def predict(req: PredictRequest, db: Session = Depends(get_session)):
+def predict(req: PredictRequest, db: Session = Depends(get_sync_session)):
     """
     Запускает прогнозирование для указанного отеля.
     """
@@ -65,7 +65,7 @@ def predict(req: PredictRequest, db: Session = Depends(get_session)):
 
 
 @app.post("/train")
-def train(req: TrainRequest, db: Session = Depends(get_session)):
+def train(req: TrainRequest, db: Session = Depends(get_sync_session)):
     """
     Обучает или дообучает модель для отеля.
     """
