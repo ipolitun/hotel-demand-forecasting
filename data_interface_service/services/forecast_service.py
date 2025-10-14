@@ -98,10 +98,10 @@ async def get_forecast(
     forecast_end = target_date + timedelta(days=horizon - 1)
 
     conditions = [
-        Booking.hotel_id == hotel_id,
-        Booking.arrival_date >= forecast_start,
-        Booking.arrival_date <= forecast_end,
-        Booking.has_deposit == has_deposit,
+        Prediction.hotel_id == hotel_id,
+        Prediction.arrival_date >= forecast_start,
+        Prediction.arrival_date <= forecast_end,
+        Prediction.has_deposit == has_deposit,
     ]
 
     stmt = (
