@@ -1,7 +1,6 @@
 import logging
 from datetime import datetime, date
-from sqlalchemy.orm import Session
-from shared.db import get_session_sync
+from shared.db import get_sync_session
 from scheduler_service.config import ROUTER_SERVICE_URL, MAX_DATA_DATE
 import httpx
 
@@ -9,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 def trigger_forecast():
     logger.info("[%s] Запуск задачи trigger_forecast()", datetime.now())
-    session: Session = get_session_sync()
+    session = get_sync_session()
 
     try:
         # TODO: заменить на динамическое получение из БД
