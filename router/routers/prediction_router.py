@@ -1,9 +1,11 @@
 import logging
-import requests
-from fastapi import APIRouter, status
+import httpx
+from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
+
 from router.config import PREDICTION_SERVICE_URL
 from router.schemas import PredictRequest, PredictResponse
+from router.dependencies import get_http_client
 
 from shared.errors import (
     register_errors,
@@ -26,27 +28,32 @@ router = APIRouter()
     response_description="Возвращает прогноз спроса и отмен для заданной даты",
 )
 @register_errors(
-    ValidationError,ExternalServiceError,
-    ModelConfigError, ModelNotFoundError,ServiceError,
+    ValidationError, ExternalServiceError,
+    ModelConfigError, ModelNotFoundError, ServiceError,
 )
-def run_prediction(req: PredictRequest):
+async def run_prediction(
+    req: PredictRequest,
+    client: httpx.AsyncClient = Depends(get_http_client),
+):
     """
     Прокси-запрос в prediction_service.
+    Использует общий асинхронный httpx.AsyncClient.
     """
     try:
         logger.info("Вызов run_prediction: %s", req.model_dump())
-        response = requests.post(
+
+        response = await client.post(
             f"{PREDICTION_SERVICE_URL}/run-predict",
             json=req.model_dump(),
             timeout=10,
         )
+
         result = response.json()
-    except requests.ConnectionError as e:
+
+    except httpx.RequestError as e:
         logger.error("Ошибка соединения с prediction_service: %s", e)
         raise ExternalServiceError("Сервис прогнозирования недоступен")
-    except requests.Timeout as e:
-        logger.error("Таймаут при обращении к prediction_service: %s", e)
-        raise ExternalServiceError("Превышено время ожидания ответа от prediction_service")
+
     except ValueError as e:
         logger.exception("Ошибка при парсинге ответа prediction_service: %s", e)
         raise ExternalServiceError("Некорректный ответ от prediction_service")
