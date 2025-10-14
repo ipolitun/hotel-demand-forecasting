@@ -111,32 +111,56 @@
 
 
     async function authorize() {
-        const key = document.getElementById('apiKey').value;
-        if (key.trim().length === 0) {
-            alert("Введите API ключ.");
+        const key = document.getElementById("apiKey").value.trim();
+        if (!key) {
+            alert("Введите API-ключ.");
             return;
         }
 
         try {
-            const response = await fetch("http://localhost:8001/auth", {
+            const response = await fetch("http://localhost:8001/auth/login", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ api_key: key })
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ api_key: key }),
             });
 
+            const result = await response.json().catch(() => ({}));
+
             if (!response.ok) {
-                throw new Error("Ошибка авторизации");
+                // Централизованный формат ошибок ServiceError
+                if (result.error && result.error.type) {
+                    const { type, message } = result.error;
+                    switch (type) {
+                        case "AuthorizationError":
+                            alert("🔒 Ошибка авторизации: " + message);
+                            break;
+                        case "ExternalServiceError":
+                            alert("🌐 Сервис авторизации недоступен: " + message);
+                            break;
+                        default:
+                            alert(`❔ Неизвестная ошибка (${type}): ${message}`);
+                    }
+                } else {
+                    alert("❌ Не удалось выполнить авторизацию.");
+                }
+                return;
             }
 
-            const data = await response.json();
-            localStorage.setItem("access_token", data.access_token);
+            // ✅ Успешный ответ
+            const token = result.access_token;
+            if (!token) {
+                alert("⚠️ Ошибка: токен не получен.");
+                return;
+            }
 
-            document.getElementById('loginSection').classList.add('hidden');
-            document.getElementById('mainSection').classList.remove('hidden');
+            localStorage.setItem("access_token", token);
+
+            document.getElementById("loginSection").classList.add("hidden");
+            document.getElementById("mainSection").classList.remove("hidden");
+
+            alert("✅ Авторизация успешна!");
         } catch (err) {
-            alert("Неверный API ключ или ошибка сервера.");
+            alert("🚫 Ошибка соединения с сервером: " + err.message);
             console.error(err);
         }
     }
