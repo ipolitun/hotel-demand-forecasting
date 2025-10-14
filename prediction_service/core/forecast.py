@@ -19,7 +19,6 @@ from prediction_service.preprocessing.scaling import normalize_data, denormalize
 
 logger = logging.getLogger(__name__)
 
-session = get_sync_session()
 
 def aggregate_forecast_inputs(df: pd.DataFrame) -> pd.DataFrame:
     """
