@@ -5,9 +5,9 @@ from datetime import datetime
 from fastapi import FastAPI, Depends, status
 from sqlalchemy.orm import Session
 
-from core.model_loader import load_model_and_config
-from core.forecast import run_forecast_for_hotel
-from core.trainer import train_model_for_hotel, setup_hotel_model_from_base
+from prediction_service.core.model_loader import load_model_and_config
+from prediction_service.core.forecast import run_forecast_for_hotel
+from prediction_service.core.trainer import train_model_for_hotel, setup_hotel_model_from_base
 from prediction_service.config import MODEL_DIR
 from prediction_service.schemas import (
     TrainRequest, TrainResponse,
