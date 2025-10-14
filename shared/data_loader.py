@@ -1,42 +1,59 @@
-# shared/data_loader.py
-
 import pandas as pd
 from sqlalchemy.orm import Session
 from shared.models import Booking, Weather, Holiday, Hotel
+from shared.errors import DatabaseError, ValidationError
 
 
 def load_bookings(hotel_id: int, db: Session) -> pd.DataFrame:
-    records = db.query(Booking).filter(Booking.hotel_id == hotel_id).all()
+    """Загружает данные о бронированиях для указанного отеля."""
+    try:
+        records = db.query(Booking).filter(Booking.hotel_id == hotel_id).all()
+    except Exception as e:
+        raise DatabaseError(f"Ошибка при загрузке бронирований для hotel_id={hotel_id}: {e}")
+
     if not records:
-        raise ValueError(f"Нет данных о бронированиях для hotel_id={hotel_id}")
+        raise ValidationError(f"Нет данных о бронированиях для hotel_id={hotel_id}")
+
     df = pd.DataFrame([b.__dict__ for b in records])
-    df['arrival_date'] = pd.to_datetime(df['arrival_date'])
+    df["arrival_date"] = pd.to_datetime(df["arrival_date"], errors="coerce")
     return df
 
 
 def load_weather(hotel_id: int, db: Session) -> pd.DataFrame:
-    # Получение city_id отеля
-    city_id = db.query(Hotel.city_id).filter(Hotel.id == hotel_id).scalar()
-    if city_id is None:
-        raise ValueError(f"Не удалось найти city_id для hotel_id={hotel_id}")
+    """Загружает погодные данные по городу, связанному с отелем."""
+    try:
+        city_id = db.query(Hotel.city_id).filter(Hotel.id == hotel_id).scalar()
+    except Exception as e:
+        raise DatabaseError(f"Ошибка при получении city_id для hotel_id={hotel_id}: {e}")
 
-    # Загрузка только нужных столбцов: date и temp_avg
-    records = db.query(Weather.date, Weather.temp_avg).filter(Weather.city_id == city_id).all()
+    if city_id is None:
+        raise ValidationError(f"Не найден city_id для hotel_id={hotel_id}")
+
+    try:
+        records = db.query(Weather.date, Weather.temp_avg).filter(Weather.city_id == city_id).all()
+    except Exception as e:
+        raise DatabaseError(f"Ошибка при загрузке погодных данных для city_id={city_id}: {e}")
+
     df = pd.DataFrame(records, columns=["date", "temp_avg"])
 
-    if not df.empty:
-        df["date"] = pd.to_datetime(df["date"])
-        # Убедимся, что temp_avg имеет числовой тип
-        df["temp_avg"] = pd.to_numeric(df["temp_avg"], errors="coerce")
-    else:
-        df["date"] = pd.Series(dtype="datetime64[ns]")
-        df["temp_avg"] = pd.Series(dtype="float64")
+    if df.empty:
+        raise ValidationError(f"Нет погодных данных для city_id={city_id}")
 
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df["temp_avg"] = pd.to_numeric(df["temp_avg"], errors="coerce")
     return df
 
 
 def load_holidays(db: Session) -> pd.DataFrame:
-    records = db.query(Holiday).all()
+    """Загружает данные о праздничных днях."""
+    try:
+        records = db.query(Holiday).all()
+    except Exception as e:
+        raise DatabaseError(f"Ошибка при загрузке данных о праздниках: {e}")
+
+    if not records:
+        raise ValidationError("Данные о праздничных днях отсутствуют")
+
     df = pd.DataFrame([h.__dict__ for h in records])
-    df['date'] = pd.to_datetime(df['date']) if not df.empty else pd.Series(dtype="datetime64[ns]")
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
     return df

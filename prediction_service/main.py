@@ -19,11 +19,11 @@ from prediction_service.schemas import (
 from shared.db import get_sync_session
 from shared.models import Prediction
 from shared.errors import (
-    register_error_handlers, setup_openapi_with_errors,
-    register_errors,
+    register_error_handlers,
+    setup_openapi_with_errors,register_errors,
     ServiceError, ValidationError,
     ModelConfigError, ModelNotFoundError,
-    ExternalServiceError,
+    ExternalServiceError, DatabaseError,
 )
 
 logger = logging.getLogger(__name__)
@@ -39,11 +39,15 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Prediction Service API", lifespan=lifespan)
 
 
-@register_errors(ModelNotFoundError, ModelConfigError, ValidationError, ServiceError)
 @app.post(
     "/run-predict",
     response_model=PredictResponse,
-    status_code=status.HTTP_200_OK)
+    status_code=status.HTTP_200_OK
+)
+@register_errors(
+    ModelNotFoundError, ModelConfigError,
+    ValidationError, ServiceError, DatabaseError
+)
 def predict(
         req: PredictRequest,
         db: Session = Depends(get_sync_session)
@@ -67,19 +71,24 @@ def predict(
         for day in result["forecast"]
     ]
 
-    db.bulk_save_objects(predictions)
-    db.commit()
-    logger.info(f"Прогноз сохранён: {len(result['forecast'])} записей")
+    try:
+        db.bulk_save_objects(predictions)
+        db.commit()
+        logger.info(f"Прогноз сохранён: {len(predictions)} записей для hotel_id={req.hotel_id}")
+    except Exception as e:
+        db.rollback()
+        logger.exception("Ошибка при сохранении прогноза в БД: %s", e)
+        raise DatabaseError("Ошибка при сохранении прогноза в базу данных")
 
     return PredictResponse(**result)
 
 
-@register_errors(ServiceError)
 @app.post(
     "/train",
     response_model=TrainResponse,
     status_code=status.HTTP_202_ACCEPTED
 )
+@register_errors(ServiceError)
 def train(
         req: TrainRequest,
         db: Session = Depends(get_sync_session)
@@ -102,12 +111,12 @@ def train(
     )
 
 
-@register_errors(ServiceError)
 @app.post(
     "/init_hotel/{hotel_id}",
     response_model=InitHotelResponse,
     status_code=status.HTTP_201_CREATED
 )
+@register_errors(ServiceError)
 def init_hotel(hotel_id: int):
     """
     Инициализирует директорию модели для нового отеля.
@@ -138,11 +147,14 @@ def check_model_status(hotel_id: int) -> ModelStatusResponse:
         config_exists=config_path.exists(),
     )
 
-@register_errors(ServiceError, ExternalServiceError, ModelNotFoundError, ModelConfigError)
 @app.get(
     "/config/{hotel_id}",
     response_model=ModelConfigResponse,
     status_code=status.HTTP_200_OK
+)
+@register_errors(
+    ServiceError, ExternalServiceError,
+    ModelNotFoundError, ModelConfigError
 )
 def get_model_config(hotel_id: int) -> ModelConfigResponse:
     """
