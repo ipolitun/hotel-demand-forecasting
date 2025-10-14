@@ -1,3 +1,4 @@
+import asyncio
 from io import StringIO
 from datetime import date
 import logging
@@ -146,10 +147,11 @@ async def prepare_booking_dataframe(
     if not content.strip():
         raise CSVProcessingError("Загруженный файл пуст.")
 
-    df = read_csv_to_dataframe(content)
-    validate_booking_columns(df)
-    df = normalize_booking_dataframe(df)
-    df["arrival_date_parsed"] = df.apply(parse_date, axis=1)
+    # --- CPU-bound части переносим в thread pool ---
+    df = await asyncio.to_thread(read_csv_to_dataframe, content)
+    await asyncio.to_thread(validate_booking_columns, df)
+    df = await asyncio.to_thread(normalize_booking_dataframe, df)
+    df["arrival_date_parsed"] = await asyncio.to_thread(df.apply, parse_date, axis=1)
 
     existing_refs = await get_existing_booking_refs(db, hotel_id)
     logger.info("Подготовлено строк: %s; существующих booking_ref: %s", len(df), len(existing_refs))
