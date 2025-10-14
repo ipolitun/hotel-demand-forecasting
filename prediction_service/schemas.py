@@ -9,8 +9,29 @@ class TrainRequest(BaseModel):
     init: bool = False
 
 
+class TrainResponse(BaseModel):
+    hotel_id: int
+    message: str
+
+
 class InitHotelRequest(BaseModel):
     hotel_id: int
+
+
+class InitHotelResponse(BaseModel):
+    hotel_id: int
+    path: str
+
+
+class ModelStatusResponse(BaseModel):
+    hotel_id: int
+    model_exists: bool
+    config_exists: bool
+
+
+class ModelConfigResponse(BaseModel):
+    hotel_id: int
+    config: dict
 
 
 class PredictRequest(BaseModel):

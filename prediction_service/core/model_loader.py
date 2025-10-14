@@ -5,7 +5,13 @@ from typing import Tuple, Dict
 from torch.nn import Module
 
 from prediction_service.config import MODEL_DIR
-from core.gru_model import GRUForecaster
+from prediction_service.core.gru_model import GRUForecaster
+from shared.errors import (
+    ServiceError,
+    ExternalServiceError,
+    ModelNotFoundError,
+    ModelConfigError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -19,18 +25,22 @@ def load_model_config(hotel_id: int) -> dict:
     """
     config_path = MODEL_DIR / f"hotel_{hotel_id}/model_config.json"
     if not config_path.exists():
-        raise FileNotFoundError(f"Конфигурация модели не найдена: {config_path}")
+        raise ModelNotFoundError(f"Конфигурация модели не найдена: {config_path}")
 
-    with config_path.open("r", encoding="utf-8") as f:
-        config = json.load(f)
+    try:
+        with config_path.open("r", encoding="utf-8") as f:
+            config = json.load(f)
+    except json.JSONDecodeError as e:
+        raise ModelConfigError(f"Ошибка парсинга JSON: {e}")
 
     required_keys = [
         "numeric_features", "embedding_sizes", "hidden_size",
         "gru_layers", "dropout", "forecast_horizon", "output_dims"
     ]
-    for key in required_keys:
-        if key not in config:
-            raise ValueError(f"Отсутствует ключ '{key}' в конфиге модели hotel_id={hotel_id}")
+
+    missing_keys = [k for k in required_keys if k not in config]
+    if missing_keys:
+        raise ModelConfigError(f"Отсутствуют обязательные ключи: {', '.join(missing_keys)}")
 
     logger.info(f"Загружен конфиг модели для hotel_id={hotel_id}")
     return config
@@ -45,36 +55,44 @@ def load_model_and_config(hotel_id: int) -> Tuple[Module, dict]:
     """
     config = load_model_config(hotel_id)
 
-    # Убираем таргет-признаки, которые не нужны в инференсе
+    # Исключаем таргет-признаки
     config["numeric_features"] = [
         col for col in config["numeric_features"]
         if not (col.startswith("book_d") or col.startswith("cancel_d"))
     ]
     config["num_numeric_features"] = len(config["numeric_features"])
 
-    # Приведение embedding_sizes к Dict[str, Tuple[int, int]]
-    embedding_sizes: Dict[str, Tuple[int, int]] = {
-        k: (int(v[0]), int(v[1])) for k, v in config["embedding_sizes"].items()
-    }
+    # Приведение embedding_sizes
+    try:
+        embedding_sizes: Dict[str, Tuple[int, int]] = {
+            k: (int(v[0]), int(v[1])) for k, v in config["embedding_sizes"].items()
+        }
+    except Exception as e:
+        raise ModelConfigError(f"Ошибка в формате embedding_sizes: {e}")
 
     model_path = MODEL_DIR / f"hotel_{hotel_id}/model.pt"
     if not model_path.exists():
-        raise FileNotFoundError(f"Файл модели не найден: {model_path}")
+        raise ModelNotFoundError(f"Файл модели не найден: {model_path}")
 
-    # Инициализация модели
-    model = GRUForecaster(
-        num_numeric_features=config["num_numeric_features"],
-        embedding_sizes=embedding_sizes,
-        hidden_size=int(config["hidden_size"]),
-        gru_layers=int(config["gru_layers"]),
-        dropout=float(config["dropout"]),
-        forecast_horizon=int(config["forecast_horizon"]),
-        output_dims=int(config["output_dims"]),
-    )
-
-    # Загрузка весов
-    model.load_state_dict(torch.load(model_path, map_location="cpu"))
-    model.eval()
+    try:
+        # Инициализация модели
+        model = GRUForecaster(
+            num_numeric_features=config["num_numeric_features"],
+            embedding_sizes=embedding_sizes,
+            hidden_size=int(config["hidden_size"]),
+            gru_layers=int(config["gru_layers"]),
+            dropout=float(config["dropout"]),
+            forecast_horizon=int(config["forecast_horizon"]),
+            output_dims=int(config["output_dims"]),
+        )
+        # Загрузка весов
+        model.load_state_dict(torch.load(model_path, map_location="cpu"))
+        model.eval()
+    except RuntimeError as e:
+        raise ExternalServiceError(f"Ошибка загрузки весов модели: {e}")
+    except Exception as e:
+        logger.exception("Непредвиденная ошибка при загрузке модели")
+        raise ServiceError(f"Ошибка при инициализации модели: {e}")
 
     logger.info(f"Модель успешно загружена для hotel_id={hotel_id}")
     return model, config

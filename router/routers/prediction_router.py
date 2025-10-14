@@ -1,15 +1,35 @@
 import logging
 import requests
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, status
+from fastapi.responses import JSONResponse
 from router.config import PREDICTION_SERVICE_URL
-from router.schemas import PredictionRequest, PredictionResponse
+from router.schemas import PredictRequest, PredictResponse
+
+from shared.errors import (
+    register_errors,
+    ValidationError,
+    ExternalServiceError,
+    ModelConfigError,
+    ModelNotFoundError,
+    ServiceError,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/run-prediction", response_model=PredictionResponse)
-def run_prediction(req: PredictionRequest):
+@router.post(
+    "/run-prediction",
+    response_model=PredictResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Запуск прогноза для отеля",
+    response_description="Возвращает прогноз спроса и отмен для заданной даты",
+)
+@register_errors(
+    ValidationError,ExternalServiceError,
+    ModelConfigError, ModelNotFoundError,ServiceError,
+)
+def run_prediction(req: PredictRequest):
     """
     Прокси-запрос в prediction_service.
     """
@@ -20,8 +40,27 @@ def run_prediction(req: PredictionRequest):
             json=req.model_dump(),
             timeout=10,
         )
-        response.raise_for_status()
-        return response.json()
-    except requests.RequestException as e:
-        logger.error("Ошибка при обращении к prediction_service: %s", e)
-        raise HTTPException(status_code=500, detail="Prediction service error")
+        result = response.json()
+    except requests.ConnectionError as e:
+        logger.error("Ошибка соединения с prediction_service: %s", e)
+        raise ExternalServiceError("Сервис прогнозирования недоступен")
+    except requests.Timeout as e:
+        logger.error("Таймаут при обращении к prediction_service: %s", e)
+        raise ExternalServiceError("Превышено время ожидания ответа от prediction_service")
+    except ValueError as e:
+        logger.exception("Ошибка при парсинге ответа prediction_service: %s", e)
+        raise ExternalServiceError("Некорректный ответ от prediction_service")
+
+    if response.status_code != status.HTTP_200_OK:
+        if isinstance(result, dict) and "error" in result:
+            # Проксируем JSON-ошибку без изменений
+            return JSONResponse(status_code=response.status_code, content=result)
+        logger.error("Неожиданный ответ prediction_service: %s", result)
+        raise ExternalServiceError("Некорректный формат ответа prediction_service")
+
+    logger.info(
+        "Прогноз успешно получен через router_service: hotel_id=%s, target_date=%s",
+        req.hotel_id,
+        req.target_date,
+    )
+    return result

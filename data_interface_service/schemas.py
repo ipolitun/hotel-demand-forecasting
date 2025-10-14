@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field
 from datetime import date
 
@@ -6,7 +6,7 @@ from datetime import date
 class ForecastRequest(BaseModel):
     """Запрос на получение истории и прогноза бронирований."""
     target_date: date = Field(..., description="Целевая дата прогноза (YYYY-MM-DD)")
-    horizon: int = Field(..., ge=1, le=30, description="Горизонт прогноза, дней")
+    horizon: int = Field(..., ge=0, le=30, description="Горизонт прогноза, дней")
     history_window: int = Field(30, ge=1, le=90, description="Окно истории, дней")
     has_deposit: bool = Field(..., description="True — с депозитом, False — без")
 

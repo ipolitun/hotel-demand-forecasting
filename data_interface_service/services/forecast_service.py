@@ -4,10 +4,10 @@ import logging
 from sqlalchemy import select, func, case, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.models import Booking, Prediction
 from data_interface_service.schemas import ForecastDay
 from data_interface_service.utils.mapping import map_to_forecast_day
-from data_interface_service.exceptions import (
+from shared.models import Booking, Prediction
+from shared.errors import (
     InsufficientHistoryError,
     NoForecastError,
 )

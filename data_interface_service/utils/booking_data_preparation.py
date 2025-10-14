@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.models import Booking
-from data_interface_service.exceptions import CSVProcessingError
+from shared.errors import CSVProcessingError
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,8 @@ NUMERIC_GROUPS = {
     "metrics": {"cols": ["lead_time", "booking_changes", "adr"], "default": 0.0, "type": float},
 }
 
-# --- CSV: чтение и подготовка ---
+
+# === CSV: чтение и подготовка ===
 
 def detect_separator(content: str) -> str:
     """Определяет разделитель CSV-файла."""
@@ -49,7 +50,8 @@ def read_csv_to_dataframe(content: str) -> pd.DataFrame:
     logger.debug("CSV успешно прочитан: %s строк, %s колонок", df.shape[0], df.shape[1])
     return df
 
-# --- Валидация и нормализация ---
+
+# === Валидация и нормализация ===
 
 def validate_booking_columns(df: pd.DataFrame) -> None:
     """Проверяет наличие обязательных колонок для бронирований."""
@@ -108,7 +110,8 @@ def parse_date(row) -> date:
         logger.error("Ошибка формирования даты прибытия: %s", e)
         raise CSVProcessingError("Ошибка формирования даты прибытия. Проверьте поля arrival_date или year/month/day")
 
-# --- Работа с БД ---
+
+# === Работа с БД ===
 
 async def get_existing_booking_refs(db: AsyncSession, hotel_id: int) -> Set[str]:
     """Извлекает существующие booking_ref из базы (для исключения дубликатов)."""
@@ -122,7 +125,8 @@ async def get_existing_booking_refs(db: AsyncSession, hotel_id: int) -> Set[str]
     logger.debug("Hotel %s: найдено %s существующих booking_ref", hotel_id, len(refs))
     return refs
 
-# --- Общий pipeline подготовки ---
+
+# === Общий pipeline подготовки ===
 
 async def prepare_booking_dataframe(
         content: str,

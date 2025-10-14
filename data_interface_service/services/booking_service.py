@@ -1,17 +1,17 @@
 import logging
-from typing import List, Tuple
+from typing import List
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from data_interface_service.utils.booking_data_preparation import prepare_booking_dataframe
 from data_interface_service.utils.mapping import map_row_to_booking
-from data_interface_service.exceptions import (
+from shared.models import Booking
+from shared.errors import (
     CSVProcessingError,
     MappingError,
     DatabaseError,
     ConflictError,
 )
-from shared.models import Booking
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ async def import_bookings_from_csv(
     db: AsyncSession,
     hotel_id: int,
     content: str,
-) -> Tuple[List[Booking], int]:
+) -> tuple[list[Booking], int]:
     """
     Обработка CSV:
     - подготовка DataFrame (чтение, валидация, нормализация, парсинг дат),
@@ -46,7 +46,7 @@ async def import_bookings_from_csv(
             if booking:
                 bookings.append(booking)
         except MappingError as e:
-            logger.error("Ошибка маппинга в строке %s (booking_ref=%s): %s", booking_ref, e)
+            logger.error("Ошибка преобразования данных в строке %s (booking_ref=%s): %s", booking_ref, e)
             raise
 
     if not bookings and duplicates_skipped > 0:

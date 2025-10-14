@@ -1,7 +1,7 @@
 import logging
-from shared.models import Booking
 from data_interface_service.schemas import ForecastDay
-from data_interface_service.exceptions import MappingError
+from shared.models import Booking
+from shared.errors import MappingError
 
 logger = logging.getLogger(__name__)
 

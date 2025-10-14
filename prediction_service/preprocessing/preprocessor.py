@@ -4,6 +4,13 @@ import joblib
 from pathlib import Path
 import logging
 
+from shared.errors import (
+    ServiceError,
+    ValidationError,
+    MappingError,
+    ModelConfigError,
+)
+
 logger = logging.getLogger(__name__)
 
 # Соответствие: имя сохранённого энкодера -> оригинальная колонка
@@ -20,23 +27,34 @@ def load_encoder(name: str, hotel_id: int):
     """
     path = Path(f"prediction_service/models/hotel_{hotel_id}/encoders") / f"{name}.pkl"
     logger.debug(f"Загрузка энкодера {name}: {path}")
-    return joblib.load(path)
+
+    if not path.exists():
+        logger.error(f"Энкодер не найден: {path}")
+        raise ModelConfigError(f"Энкодер {name} отсутствует для hotel_id={hotel_id}")
+
+    try:
+        return joblib.load(path)
+    except Exception as e:
+        logger.exception(f"Ошибка при загрузке энкодера {name}: {e}")
+        raise ModelConfigError(f"Ошибка при загрузке энкодера {name}: {e}")
 
 
 def encode_categorical_features(df: pd.DataFrame, hotel_id: int) -> pd.DataFrame:
     """
     Применяет сохранённые энкодеры к категориальным колонкам.
-
-    Returns:
-        pd.DataFrame: DataFrame с закодированными признаками.
     """
     for enc_col, orig_col in ENCODING_MAP.items():
         if orig_col not in df.columns:
-            logger.error(f"Отсутствует колонка {orig_col} для кодирования в {enc_col}")
-            raise ValueError(f"Missing required column {orig_col}")
+            logger.warning(f"Отсутствует колонка {orig_col} для кодирования ({enc_col})")
+            raise MappingError(f"Отсутствует колонка {orig_col} для кодирования")
 
         encoder = load_encoder(enc_col, hotel_id)
-        df[enc_col] = encoder.transform(df[orig_col].astype(str))
+
+        try:
+            df[enc_col] = encoder.transform(df[orig_col].astype(str))
+        except Exception as e:
+            logger.exception(f"Ошибка кодирования колонки {orig_col}: {e}")
+            raise MappingError(f"Ошибка при кодировании колонки {orig_col}: {e}")
 
     df.drop(columns=list(ENCODING_MAP.values()), inplace=True, errors="ignore")
     logger.debug("Категориальные признаки закодированы")
@@ -46,32 +64,33 @@ def encode_categorical_features(df: pd.DataFrame, hotel_id: int) -> pd.DataFrame
 def preprocess_dates(df: pd.DataFrame) -> pd.DataFrame:
     """
     Приводит колонку arrival_date к datetime и проверяет корректность.
-
-    Returns:
-        pd.DataFrame: DataFrame с преобразованной датой.
     """
-    if not np.issubdtype(df['arrival_date'].dtype, np.datetime64):
-        logger.debug("Преобразование arrival_date в datetime")
-        df['arrival_date'] = pd.to_datetime(df['arrival_date'], errors='coerce')
+    try:
+        if not np.issubdtype(df['arrival_date'].dtype, np.datetime64):
+            logger.debug("Преобразование arrival_date в datetime")
+            df['arrival_date'] = pd.to_datetime(df['arrival_date'], errors='coerce')
 
-    invalid_dates = df['arrival_date'].isna().sum()
-    if invalid_dates > 0:
-        logger.error(f"Обнаружено {invalid_dates} некорректных дат в arrival_date")
-        raise ValueError("Invalid arrival_date after conversion")
-
-    return df
+        invalid_dates = df['arrival_date'].isna().sum()
+        if invalid_dates > 0:
+            raise ValidationError(f"Обнаружено {invalid_dates} некорректных дат в arrival_date")
+        return df
+    except Exception as e:
+        logger.exception("Ошибка при обработке даты прибытия")
+        raise ValidationError(f"Ошибка при обработке даты прибытия: {e}")
 
 
 def add_derived_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     Добавляет derived-признаки.
-
-    Returns:
-        pd.DataFrame: DataFrame с новыми признаками.
     """
-    df['lead_time_log'] = np.log1p(df['lead_time'])
-    logger.debug("Добавлен признак lead_time_log")
-    return df
+    try:
+        df['lead_time_log'] = np.log1p(df['lead_time'])
+        logger.debug("Добавлен признак lead_time_log")
+        return df
+    except Exception as e:
+        logger.exception("Ошибка при создании производных признаков")
+        raise ServiceError(f"Ошибка при добавлении признаков: {e}")
+
 
 def check_missing_for_aggregation(df: pd.DataFrame):
     """
@@ -79,7 +98,7 @@ def check_missing_for_aggregation(df: pd.DataFrame):
     """
     if df[['arrival_date', 'is_cancellation']].isnull().any().any():
         logger.error("Пропущенные значения в arrival_date или is_cancellation")
-        raise ValueError("Missing values in columns for aggregation")
+        raise ValidationError("Пропущенные значения в arrival_date или is_cancellation")
 
 
 def aggregate_historical_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -147,11 +166,14 @@ def enforce_numeric_types(df: pd.DataFrame) -> pd.DataFrame:
         "total_nights", "booking_changes", "temp_avg",
         "bookings_last_year", "cancels_last_year"
     ]
-    for col in numeric_cols:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
-    logger.debug("Числовые признаки приведены к типу numeric")
-    return df
+    try:
+        for col in numeric_cols:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+        logger.debug("Числовые признаки приведены к numeric")
+        return df
+    except Exception as e:
+        raise ValidationError(f"Ошибка при приведении типов: {e}")
 
 
 def preprocess_data(df: pd.DataFrame, hotel_id: int) -> pd.DataFrame:
@@ -162,8 +184,7 @@ def preprocess_data(df: pd.DataFrame, hotel_id: int) -> pd.DataFrame:
         pd.DataFrame: предобработанные данные для модели.
     """
     if df.empty:
-        logger.error("Получен пустой DataFrame для предобработки")
-        raise ValueError("Input DataFrame is empty")
+        raise ValidationError("Пустой DataFrame для предобработки")
 
     df = drop_irrelevant_columns(df)
     df = enforce_numeric_types(df)
@@ -176,11 +197,10 @@ def preprocess_data(df: pd.DataFrame, hotel_id: int) -> pd.DataFrame:
 
     if df.isnull().sum().sum() > 0:
         logger.warning("Есть пропущенные значения после агрегации")
+        df.ffill(inplace=True)
+        logger.debug("Выполнен forward fill для NaN")
     else:
         logger.debug("Пропусков нет")
-
-    df.ffill(inplace=True)
-    logger.debug("Выполнен forward fill для NaN")
 
     logger.info(f"Финальные признаки: {df.columns.tolist()}")
     return df
