@@ -1,25 +1,17 @@
 import httpx
 from typing import Dict
-from fastapi import Header, HTTPException
+from fastapi import Header, HTTPException, Request
 from jose import jwt, JWTError
 
 from router.config import SECRET_KEY, ALGORITHM
 
 
-# --- HTTP client (singleton) ---
-client: httpx.AsyncClient | None = None
-
-async def get_http_client() -> httpx.AsyncClient:
-    return client
-
-async def startup_event():
-    global client
-    client = httpx.AsyncClient(timeout=10)
-
-async def shutdown_event():
-    global client
-    if client:
-        await client.aclose()
+# --- HTTP client dependency ---
+async def get_http_client(request: Request) -> httpx.AsyncClient:
+    """
+    Возвращает общий экземпляр httpx.AsyncClient, инициализированный в lifespan.
+    """
+    return request.app.state.http_client
 
 
 # --- JWT verification ---
