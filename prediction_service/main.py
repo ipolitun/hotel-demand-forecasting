@@ -1,5 +1,4 @@
 import logging
-from contextlib import asynccontextmanager
 from datetime import datetime
 
 from fastapi import FastAPI, Depends, status
@@ -8,7 +7,7 @@ from sqlalchemy.orm import Session
 from prediction_service.core.model_loader import load_model_and_config
 from prediction_service.core.forecast import run_forecast_for_hotel
 from prediction_service.core.trainer import train_model_for_hotel, setup_hotel_model_from_base
-from prediction_service.config import MODEL_DIR
+from prediction_service.config import prediction_config
 from prediction_service.schemas import (
     TrainRequest, TrainResponse,
     InitHotelResponse,
@@ -126,7 +125,7 @@ def init_hotel(hotel_id: int):
     setup_hotel_model_from_base(hotel_id)
     return InitHotelResponse(
         hotel_id=hotel_id,
-        path=str(MODEL_DIR / f"hotel_{hotel_id}"),
+        path=str(prediction_config.model_dir / f"hotel_{hotel_id}"),
     )
 
 
@@ -139,8 +138,8 @@ def check_model_status(hotel_id: int) -> ModelStatusResponse:
     """
     Проверяет наличие модели и её конфигурации.
     """
-    model_path = MODEL_DIR / f"hotel_{hotel_id}/model.pt"
-    config_path = MODEL_DIR / f"hotel_{hotel_id}/model_config.json"
+    model_path = prediction_config.model_dir / f"hotel_{hotel_id}/model.pt"
+    config_path = prediction_config.model_dir / f"hotel_{hotel_id}/model_config.json"
 
     return ModelStatusResponse(
         hotel_id=hotel_id,

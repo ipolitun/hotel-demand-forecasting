@@ -1,8 +1,13 @@
-import os
-from dotenv import load_dotenv
 from pathlib import Path
 
-load_dotenv()
+from shared.base_config import ConfigBase
+from shared.db_config import DatabaseConfig
 
-# Директория для хранения моделей
-MODEL_DIR = Path(os.getenv("MODEL_DIR", "prediction_service/models"))
+
+class PredictionServiceConfig(ConfigBase):
+    model_dir: Path = Path("prediction_service/models")
+
+    database: DatabaseConfig = DatabaseConfig()
+
+
+prediction_config = PredictionServiceConfig()
