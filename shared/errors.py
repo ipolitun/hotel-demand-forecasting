@@ -210,9 +210,19 @@ def extend_openapi_with_errors(app: FastAPI):
 
 def setup_openapi_with_errors(app: FastAPI):
     """Подключает автоматическое добавление ошибок в OpenAPI."""
+    original_openapi = app.openapi
+
     def custom_openapi():
+        # если схема уже сгенерирована — возвращаем кэш
         if app.openapi_schema:
             return app.openapi_schema
-        schema = app.openapi()
-        return extend_openapi_with_errors(app)
+
+        # генерируем базовую схему (через исходную функцию FastAPI)
+        base_schema = original_openapi()
+
+        # дополняем схему зарегистрированными ошибками
+        app.openapi_schema = extend_openapi_with_errors(app)
+
+        return app.openapi_schema
+
     app.openapi = custom_openapi
