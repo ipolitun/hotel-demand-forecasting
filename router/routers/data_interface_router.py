@@ -4,7 +4,7 @@ from typing import Dict
 from fastapi import APIRouter, Depends, UploadFile, File, status
 from fastapi.responses import JSONResponse
 
-from router.config import DATA_INTERFACE_SERVICE_URL
+from router.config import router_config
 from router.schemas import ForecastRequest, ForecastResponse, BookingImportResponse
 from router.dependencies import verify_token, get_http_client
 
@@ -50,11 +50,11 @@ async def import_bookings(
 
     file_content = await file.read()
     files = {"file": (file.filename, file_content, file.content_type)}
-    headers = {"X-Hotel-Id": str(hotel_id)}
+    headers = {"X-Hotel-Id": int(hotel_id)}
 
     try:
         response = await client.post(
-            f"{DATA_INTERFACE_SERVICE_URL}/booking/import",
+            f"{router_config.data_interface_service_url}/booking/import",
             files=files,
             headers=headers,
         )
@@ -106,12 +106,12 @@ async def fetch_forecast(
     if not hotel_id:
         logger.warning("Попытка получения прогноза без hotel_id в токене")
         raise AuthorizationError("Отсутствует hotel_id в токене")
-    headers = {"X-Hotel-Id": str(hotel_id)}
+    headers = {"X-Hotel-Id": int(hotel_id)}
 
     try:
         response = await client.post(
-            f"{DATA_INTERFACE_SERVICE_URL}/forecast/fetch",
-            json=req.model_dump(),
+            f"{router_config.data_interface_service_url}/forecast/fetch",
+            json=req.model_dump(mode="json"),
             headers=headers,
         )
         result = response.json()

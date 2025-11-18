@@ -1,11 +1,13 @@
-import os
-from dotenv import load_dotenv
+from shared.base_config import ConfigBase
 
-load_dotenv()
 
-PREDICTION_SERVICE_URL = os.getenv("PREDICTION_SERVICE_URL", "http://prediction_service:8001")
-AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth-service:8002")
-DATA_INTERFACE_SERVICE_URL = os.getenv("DATA_INTERFACE_SERVICE_URL", "http://data-interface-service:8003")
+class RouterConfig(ConfigBase):
+    prediction_service_url: str = "http://prediction_service:8001"
+    auth_service_url: str = "http://auth-service:8002"
+    data_interface_service_url: str = "http://data-interface-service:8003"
 
-SECRET_KEY = os.getenv("SECRET_KEY", "super-secret")
-ALGORITHM = os.getenv("ALGORITHM", "HS256")
+    secret_key: str
+    algorithm: str = "HS256"
+
+
+router_config = RouterConfig()

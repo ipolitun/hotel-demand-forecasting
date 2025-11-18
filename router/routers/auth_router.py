@@ -2,7 +2,7 @@ import logging
 import httpx
 from fastapi import APIRouter, HTTPException, Depends, status
 
-from router.config import AUTH_SERVICE_URL
+from router.config import router_config
 from router.schemas import AuthRequest, TokenResponse
 from router.dependencies import get_http_client
 
@@ -35,7 +35,7 @@ async def authorize_user(
     headers = {"X-API-Key": auth_req.api_key}
 
     try:
-        response = await client.post(f"{AUTH_SERVICE_URL}/token/user", headers=headers)
+        response = await client.post(f"{router_config.auth_service_url}/token/user", headers=headers)
         response.raise_for_status()
         logger.info("Успешная авторизация")
         return response.json()

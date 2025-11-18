@@ -3,7 +3,7 @@ import httpx
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 
-from router.config import PREDICTION_SERVICE_URL
+from router.config import router_config
 from router.schemas import PredictRequest, PredictResponse
 from router.dependencies import get_http_client
 
@@ -43,8 +43,8 @@ async def run_prediction(
         logger.info("Вызов run_prediction: %s", req.model_dump())
 
         response = await client.post(
-            f"{PREDICTION_SERVICE_URL}/run-predict",
-            json=req.model_dump(),
+            f"{router_config.prediction_service_url}/run-predict",
+            json=req.model_dump(mode="json"),
             timeout=10,
         )
 

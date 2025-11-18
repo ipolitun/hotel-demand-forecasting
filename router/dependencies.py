@@ -1,9 +1,9 @@
 import httpx
 from typing import Dict
 from fastapi import Header, Request
-from jose import jwt, JWTError
+from jose import jwt, JWTError, ExpiredSignatureError
 
-from router.config import SECRET_KEY, ALGORITHM
+from router.config import router_config
 from shared.errors import AuthorizationError
 
 
@@ -29,7 +29,9 @@ def verify_token(authorization: str = Header(...)) -> Dict:
         raise AuthorizationError("Invalid authentication scheme")
 
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, router_config.secret_key, algorithms=[router_config.algorithm])
+    except ExpiredSignatureError:
+        raise AuthorizationError("Token expired")
     except JWTError as exc:
         raise AuthorizationError("Token verification failed") from exc
 

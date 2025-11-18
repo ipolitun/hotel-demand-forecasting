@@ -6,8 +6,6 @@ python-dotenv
 psycopg2-binary
 python-jose
 pandas
-meteostat
-holidays
 python-multipart
 httpx
 asyncpg
