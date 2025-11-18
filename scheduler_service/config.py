@@ -1,8 +1,15 @@
-import os
-from dotenv import load_dotenv
+from datetime import date
 
-load_dotenv()
+from shared.base_config import ConfigBase
+from shared.db_config import DatabaseConfig
 
-ROUTER_SERVICE_URL = os.getenv("ROUTER_SERVICE_URL", "http://router:8000")
 
-MAX_DATA_DATE = os.getenv("MAX_DATA_DATE", "2017-05-10")
+class SchedulerConfig(ConfigBase):
+    router_service_url: str
+
+    database: DatabaseConfig = DatabaseConfig()
+
+    max_data_date: date = date(2017, 5, 10)
+
+
+scheduler_config = SchedulerConfig()

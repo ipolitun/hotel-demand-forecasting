@@ -9,7 +9,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY ./scheduler_service /app/scheduler_service
 COPY ./shared /app/shared
-COPY ./database /app/database
 
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1

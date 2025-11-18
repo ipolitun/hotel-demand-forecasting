@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, date
 from shared.db import get_sync_session
-from scheduler_service.config import ROUTER_SERVICE_URL, MAX_DATA_DATE
+from scheduler_service.config import scheduler_config
 import httpx
 
 logger = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ def trigger_forecast():
         return
 
     today = datetime.utcnow().date()
-    target_date = min(today, date.fromisoformat(MAX_DATA_DATE))
+    target_date = min(today, date.fromisoformat(scheduler_config.max_data_date))
 
     for hotel_id in hotel_ids:
         for has_deposit in [False]:
@@ -31,7 +31,7 @@ def trigger_forecast():
 
             try:
                 response = httpx.post(
-                    f"{ROUTER_SERVICE_URL}/prediction/run-prediction",
+                    f"{scheduler_config.router_service_url}/prediction/run-prediction",
                     json=payload,
                     timeout=10
                 )
