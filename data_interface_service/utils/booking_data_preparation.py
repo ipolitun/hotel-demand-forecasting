@@ -1,39 +1,30 @@
 import asyncio
+import csv
 from io import StringIO
-from datetime import date
 import logging
-from typing import Tuple, Set
 
 import pandas as pd
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.models import Booking
+from data_interface_service.utils.date_parsing import parse_dates_vectorized
+from data_interface_service.utils.booking_constants import (
+    CATEGORICAL_COLUMNS,
+    NUMERIC_COLUMNS,
+    AGGREGATES,
+)
 from shared.errors import CSVProcessingError
 
 logger = logging.getLogger(__name__)
-
-MONTH_MAP = {
-    'January': 1, 'February': 2, 'March': 3, 'April': 4,
-    'May': 5, 'June': 6, 'July': 7, 'August': 8,
-    'September': 9, 'October': 10, 'November': 11, 'December': 12
-}
-
-NUMERIC_GROUPS = {
-    "guests": {"cols": ["adults", "children", "babies", "total_guests"], "default": 0, "type": int},
-    "nights": {"cols": ["stays_in_weekend_nights", "stays_in_week_nights", "total_nights"], "default": 0, "type": int},
-    "metrics": {"cols": ["lead_time", "booking_changes", "adr"], "default": 0.0, "type": float},
-}
 
 
 # === CSV: чтение и подготовка ===
 
 def detect_separator(content: str) -> str:
-    """Определяет разделитель CSV-файла."""
-    sample = content[:1000]
-    sep = ';' if sample.count(';') > sample.count(',') else ','
-    logger.debug("Определён разделитель CSV: '%s'", sep)
-    return sep
+    """Определяет наиболее вероятный разделитель CSV-файла."""
+    sample = content[:2000]
+    try:
+        return csv.Sniffer().sniff(sample, delimiters=";,").delimiter
+    except Exception:
+        return ";" if sample.count(";") > sample.count(",") else ","
 
 
 def read_csv_to_dataframe(content: str) -> pd.DataFrame:
@@ -41,8 +32,8 @@ def read_csv_to_dataframe(content: str) -> pd.DataFrame:
     try:
         sep = detect_separator(content)
         df = pd.read_csv(StringIO(content), sep=sep)
-    except Exception as e:
-        logger.exception("Ошибка чтения CSV: %s", e)
+    except Exception:
+        logger.exception("Ошибка чтения CSV")
         raise CSVProcessingError("Ошибка чтения CSV (неверный формат или разделитель).")
 
     if df.empty:
@@ -71,60 +62,79 @@ def validate_booking_columns(df: pd.DataFrame) -> None:
         raise CSVProcessingError(f"Отсутствуют обязательные колонки: {', '.join(missing)}.")
 
 
-def normalize_booking_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """Заполняет отсутствующие поля и пропуски по умолчанию."""
-    df['market_segment'] = df.get('market_segment', 'Undefined')
-    df['distribution_channel'] = df.get('distribution_channel', 'Undefined')
-    df["booking_ref"] = df.get("booking_ref", pd.Series(dtype=str)).fillna("")
+def clean_numeric_series(series: pd.Series, default, dtype) -> pd.Series:
+    """
+    Очистка числовой серии:
+    — нормализует мусорные значения,
+    — конвертирует в числа,
+    — приводит к dtype.
+    """
+    s = series.astype(str).str.strip()
+    bad_values = ["", "None", "none", "NULL", "null", "NaN", "nan", "N/A", "n/a"]
 
-    for group_name, group in NUMERIC_GROUPS.items():
-        for col in group["cols"]:
-            default = group["default"]
-            dtype = group["type"]
-            df[col] = df.get(col, default).fillna(default).astype(dtype)
+    s = s.replace(bad_values, str(default))
+    s = s.replace(r"^\s*$", str(default), regex=True)
+
+    numeric = pd.to_numeric(s, errors="coerce")
+    numeric = numeric.fillna(default)
+
+    return numeric.astype(dtype)
+
+
+def normalize_columns(df: pd.DataFrame, config: dict, *, numeric: bool = False) -> pd.DataFrame:
+    """
+    Универсальная нормализация набора колонок по заданной конфигурации.
+
+    Для каждой колонки:
+    - создаёт колонку, если отсутствует;
+    - заполняет пропуски значениями default;
+    - приводит тип;
+    - вызывает числовую очистку, если mode = numeric=True.
+    """
+    for col, cfg in config.items():
+        default = cfg["default"]
+        dtype = cfg["dtype"]
+
+        if col not in df.columns:
+            df[col] = pd.Series([default] * len(df), dtype=dtype)
+            continue
+
+        if numeric:
+            df[col] = clean_numeric_series(df[col], default, dtype)
+        else:
+            df[col] = df[col].fillna(default).astype(dtype)
 
     return df
 
 
-def parse_date(row) -> date:
+def compute_aggregates(df: pd.DataFrame, aggregates: dict) -> pd.DataFrame:
     """
-    Формирует дату прибытия:
-    - либо из строки arrival_date (формат DD.MM.YYYY),
-    - либо из частей: arrival_date_year, arrival_date_month, arrival_date_day_of_month.
+    Вычисление агрегированных колонок.
+    Если агрегируемая колонка уже существует и > 0 — сохраняет её.
     """
-    try:
-        if "arrival_date" in row and pd.notna(row["arrival_date"]):
-            return pd.to_datetime(row["arrival_date"], format="%d.%m.%Y").date()
+    df = df.copy()
 
-        return date(
-            int(row["arrival_date_year"]),
-            MONTH_MAP[row["arrival_date_month"]],
-            int(row["arrival_date_day_of_month"]),
-        )
+    for target, parts in aggregates.items():
+        # Сумма по всем нужным колонкам (если колонки нет — берём 0)
+        sum_series = df[parts].sum(axis=1, min_count=1).fillna(0)
 
-    except ValueError as e:
-        raise CSVProcessingError(
-            f"Некорректный формат даты. Ожидается 'ДД.ММ.ГГГГ', получено: {row.get('arrival_date', 'N/A')}"
-        )
+        if target in df.columns:
+            # Только те строки, где агрегат ≤ 0, заменяем суммой
+            mask = df[target] <= 0
+            df.loc[mask, target] = sum_series[mask]
+        else:
+            df[target] = sum_series
 
-    except Exception as e:
-        logger.error("Ошибка формирования даты прибытия: %s", e)
-        raise CSVProcessingError("Ошибка формирования даты прибытия. Проверьте поля arrival_date или year/month/day")
+    return df
 
 
-# === Работа с БД ===
-
-async def get_existing_booking_refs(db: AsyncSession, hotel_id: int) -> Set[str]:
-    """Извлекает существующие booking_ref из базы (для исключения дубликатов)."""
-    stmt = (
-        select(Booking.booking_ref)
-        .where(Booking.hotel_id == hotel_id)
-        .where(Booking.booking_ref.isnot(None))
-    )
-    result = await db.execute(stmt)
-    refs = {ref for (ref,) in result.all()}
-    logger.debug("Hotel %s: найдено %s существующих booking_ref", hotel_id, len(refs))
-    return refs
+def normalize_booking_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """Последовательная нормализация данных бронирования."""
+    df = df.copy()
+    df = normalize_columns(df, CATEGORICAL_COLUMNS, numeric=False)
+    df = normalize_columns(df, NUMERIC_COLUMNS, numeric=True)
+    df = compute_aggregates(df, AGGREGATES)
+    return df
 
 
 # === Общий pipeline подготовки ===
@@ -132,8 +142,7 @@ async def get_existing_booking_refs(db: AsyncSession, hotel_id: int) -> Set[str]
 async def prepare_booking_dataframe(
         content: str,
         hotel_id: int,
-        db: AsyncSession,
-) -> Tuple[pd.DataFrame, Set[str]]:
+) -> pd.DataFrame:
     """
     Полная подготовка DataFrame:
     1. чтение CSV → DataFrame
@@ -151,8 +160,7 @@ async def prepare_booking_dataframe(
     df = await asyncio.to_thread(read_csv_to_dataframe, content)
     await asyncio.to_thread(validate_booking_columns, df)
     df = await asyncio.to_thread(normalize_booking_dataframe, df)
-    df["arrival_date_parsed"] = await asyncio.to_thread(df.apply, parse_date, axis=1)
+    df["arrival_date_parsed"] = await asyncio.to_thread(parse_dates_vectorized, df)
 
-    existing_refs = await get_existing_booking_refs(db, hotel_id)
-    logger.info("Подготовлено строк: %s; существующих booking_ref: %s", len(df), len(existing_refs))
-    return df, existing_refs
+    logger.info("Подготовлено строк: %s", len(df))
+    return df
