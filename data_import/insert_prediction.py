@@ -10,7 +10,7 @@ import numpy as np
 from sqlalchemy.orm import Session
 
 from shared.db import SessionLocal
-from shared.models import Prediction
+from shared.db_models import Prediction
 
 
 # === Исторические данные для примера ===

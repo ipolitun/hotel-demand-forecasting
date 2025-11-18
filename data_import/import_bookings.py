@@ -7,7 +7,7 @@ import pandas as pd
 from datetime import date
 from sqlalchemy.orm import Session
 
-from shared.models import Booking, Hotel
+from shared.db_models import Booking, Hotel
 from shared.db import SessionLocal
 
 

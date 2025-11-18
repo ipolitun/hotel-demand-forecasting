@@ -13,7 +13,7 @@ class ForecastRequest(BaseModel):
 
 class ForecastDay(BaseModel):
     """День истории или прогноза."""
-    date: date = Field(..., description="Дата (YYYY-MM-DD)")
+    day: date = Field(..., description="Дата (YYYY-MM-DD)")
     bookings: float = Field(..., ge=0, description="Все бронирования")
     cancellations: float = Field(..., ge=0, description="Отменённые бронирования")
 

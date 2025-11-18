@@ -9,7 +9,7 @@ from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from shared.db import SessionLocal
-from shared.models import Holiday
+from shared.db_models import Holiday
 
 
 def get_pt_holidays(start: date, end: date) -> list[tuple[date, str]]:

@@ -41,12 +41,12 @@ class PredictRequest(BaseModel):
 
 
 class PredictDay(BaseModel):
-    date: str
+    day: date
     bookings: float
     cancellations: float
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class PredictResponse(BaseModel):

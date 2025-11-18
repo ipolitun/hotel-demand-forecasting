@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from data_interface_service.schemas import ForecastDay
 from data_interface_service.utils.mapping import map_to_forecast_day
-from shared.models import Booking, Prediction
+from shared.db_models import Booking, Prediction
 from shared.errors import (
     InsufficientHistoryError,
     NoForecastError,
@@ -37,7 +37,7 @@ async def get_history(
     ]
 
     bookings_sum = func.count(Booking.id)
-    cancellations_sum = func.sum(case((Booking.is_cancellation == True, 1),else_=0))
+    cancellations_sum = func.sum(case((Booking.is_cancellation == True, 1), else_=0))
 
     stmt = (
         select(
@@ -54,22 +54,12 @@ async def get_history(
     history_records = result.all()
 
     if not history_records:
-        logger.warning(
-            "История пуста",
-            extra={"hotel_id": hotel_id, "target_date": target_date},
-        )
+        logger.warning("История пуста", extra={"hotel_id": hotel_id, "target_date": target_date})
         raise InsufficientHistoryError(
             f"Недостаточно данных для прогноза за {history_window} дней до {target_date}."
         )
 
-    history_days = [
-        ForecastDay(
-            date=record.arrival_date,
-            bookings=float(record.bookings or 0),
-            cancellations=float(record.cancellations or 0),
-        )
-        for record in history_records
-    ]
+    history_days = [map_to_forecast_day(record, "arrival_date") for record in history_records]
 
     total_bookings = sum(day.bookings for day in history_days)
     if total_bookings < 30:
@@ -99,8 +89,8 @@ async def get_forecast(
 
     conditions = [
         Prediction.hotel_id == hotel_id,
-        Prediction.arrival_date >= forecast_start,
-        Prediction.arrival_date <= forecast_end,
+        Prediction.target_date >= forecast_start,
+        Prediction.target_date <= forecast_end,
         Prediction.has_deposit == has_deposit,
     ]
 

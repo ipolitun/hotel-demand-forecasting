@@ -1,6 +1,6 @@
 import pandas as pd
 from sqlalchemy.orm import Session
-from shared.models import Booking, Weather, Holiday, Hotel
+from shared.db_models import Booking, Weather, Holiday, Hotel
 from shared.errors import DatabaseError, ValidationError
 
 
@@ -30,16 +30,16 @@ def load_weather(hotel_id: int, db: Session) -> pd.DataFrame:
         raise ValidationError(f"Не найден city_id для hotel_id={hotel_id}")
 
     try:
-        records = db.query(Weather.date, Weather.temp_avg).filter(Weather.city_id == city_id).all()
+        records = db.query(Weather.day, Weather.temp_avg).filter(Weather.city_id == city_id).all()
     except Exception as e:
         raise DatabaseError(f"Ошибка при загрузке погодных данных для city_id={city_id}: {e}")
 
-    df = pd.DataFrame(records, columns=["date", "temp_avg"])
+    df = pd.DataFrame(records, columns=["day", "temp_avg"])
 
     if df.empty:
         raise ValidationError(f"Нет погодных данных для city_id={city_id}")
 
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df["day"] = pd.to_datetime(df["day"], errors="coerce")
     df["temp_avg"] = pd.to_numeric(df["temp_avg"], errors="coerce")
     return df
 
@@ -55,5 +55,5 @@ def load_holidays(db: Session) -> pd.DataFrame:
         raise ValidationError("Данные о праздничных днях отсутствуют")
 
     df = pd.DataFrame([h.__dict__ for h in records])
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df["day"] = pd.to_datetime(df["day"], errors="coerce")
     return df

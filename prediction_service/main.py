@@ -17,7 +17,7 @@ from prediction_service.schemas import (
 )
 
 from shared.db import get_sync_session
-from shared.models import Prediction
+from shared.db_models import Prediction
 from shared.errors import (
     register_error_handlers,
     setup_openapi_with_errors,register_errors,
@@ -29,14 +29,15 @@ from shared.errors import (
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    register_error_handlers(app)
-    setup_openapi_with_errors(app)
-    yield
+app = FastAPI(title="Prediction Service API")
+
+register_error_handlers(app)
+setup_openapi_with_errors(app)
 
 
-app = FastAPI(title="Prediction Service API", lifespan=lifespan)
+@app.get("/")
+def root():
+    return {"message": "Prediction Service is running"}
 
 
 @app.post(
@@ -72,7 +73,7 @@ def predict(
     ]
 
     try:
-        db.bulk_save_objects(predictions)
+        db.add_all(predictions)
         db.commit()
         logger.info(f"Прогноз сохранён: {len(predictions)} записей для hotel_id={req.hotel_id}")
     except Exception as e:
@@ -146,6 +147,7 @@ def check_model_status(hotel_id: int) -> ModelStatusResponse:
         model_exists=model_path.exists(),
         config_exists=config_path.exists(),
     )
+
 
 @app.get(
     "/config/{hotel_id}",

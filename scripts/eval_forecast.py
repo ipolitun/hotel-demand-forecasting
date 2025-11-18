@@ -16,9 +16,9 @@ import pandas as pd
 from sqlalchemy.orm import Session
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
-from core.forecast import run_forecast_for_hotel
-from shared.models import Booking
-from shared.db import get_session_sync
+from prediction_service.core.forecast import run_forecast_for_hotel
+from shared.db_models import Booking
+from shared.db import SessionLocal
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -109,8 +109,8 @@ def main():
     has_deposit = False
     start_date = date(2017, 7, 1)
 
-    with get_session_sync() as db:
-        evaluate_forecast(hotel_id, has_deposit, start_date, db)
+    with SessionLocal() as session:
+        evaluate_forecast(hotel_id, has_deposit, start_date, session)
 
 
 if __name__ == "__main__":

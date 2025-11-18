@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from data_interface_service.schemas import ForecastRequest, ForecastResponse
 from data_interface_service.services.forecast_service import get_history, get_forecast
 from shared.db import get_async_session
-from shared.models import Hotel
+from shared.db_models import Hotel
 from shared.errors import (
     AuthorizationError,
     NoForecastError,

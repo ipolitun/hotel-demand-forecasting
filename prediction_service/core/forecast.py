@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from shared.db import get_sync_session
 from shared.data_loader import load_bookings, load_weather, load_holidays
-from shared.models import Hotel
+from shared.db_models import Hotel
 from shared.errors import (
     ModelConfigError,
     ValidationError,

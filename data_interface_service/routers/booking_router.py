@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from data_interface_service.services.booking_service import import_bookings_from_csv, save_bookings_to_db
 from data_interface_service.schemas import BookingImportResponse
 from shared.db import get_async_session
-from shared.models import Hotel
+from shared.db_models import Hotel
 from shared.errors import (
     register_errors,
     AuthorizationError,

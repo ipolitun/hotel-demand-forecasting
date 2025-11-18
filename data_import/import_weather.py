@@ -10,7 +10,7 @@ from meteostat import Point, Daily, Stations
 from sqlalchemy.orm import Session
 
 from shared.db import SessionLocal
-from shared.models import City, Weather, Hotel
+from shared.db_models import City, Weather, Hotel
 
 
 def safe(value):

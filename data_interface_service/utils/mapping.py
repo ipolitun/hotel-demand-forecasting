@@ -1,6 +1,6 @@
 import logging
 from data_interface_service.schemas import ForecastDay
-from shared.models import Booking
+from shared.db_models import Booking
 from shared.errors import MappingError
 
 logger = logging.getLogger(__name__)
@@ -11,9 +11,8 @@ def map_row_to_booking(row, hotel_id: int) -> Booking | None:
     Преобразует строку DataFrame в объект Booking.
     """
     try:
-        # Расчёт производных признаков
-        total_guests = int(row.get("total_guests") or (row["adults"] + row["children"] + row["babies"]))
-        total_nights = int(row.get("total_nights") or (row["stays_in_weekend_nights"] + row["stays_in_week_nights"]))
+        total_guests = int(row.get("total_guests"))
+        total_nights = int(row.get("total_nights"))
 
         if total_guests <= 0 or total_nights <= 0:
             return None # Пропускаем записи без гостей или с нулевыми ночами
@@ -39,7 +38,7 @@ def map_row_to_booking(row, hotel_id: int) -> Booking | None:
         raise MappingError(f"Некорректные значения в строке CSV: {e}")
 
     except Exception as e:
-        logger.exception("Неожиданная ошибка при формировании Booking: %s", e)
+        logger.exception("Неожиданная ошибка при формировании Booking")
         raise MappingError(f"Ошибка при формировании объекта Booking: {e}")
 
 
@@ -52,7 +51,7 @@ def map_to_forecast_day(record, date_field: str = "arrival_date") -> ForecastDay
         raise MappingError(f"Record не содержит поля {date_field}")
 
     return ForecastDay(
-        date=dt,
+        day=dt,
         bookings=float(getattr(record, "bookings", 0) or 0),
         cancellations=float(getattr(record, "cancellations", 0) or 0),
     )
