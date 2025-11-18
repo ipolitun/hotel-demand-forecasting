@@ -9,7 +9,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY ./data_interface_service /app/data_interface_service
 COPY ./shared /app/shared
-COPY ./database /app/database
 
 ENV PYTHONPATH=/app
 
