@@ -362,7 +362,7 @@
 
         const combined = [...history.map(d => ({...d, type: 'История'})), ...forecast.map(d => ({...d, type: 'Прогноз'}))];
 
-        const labels = combined.map(d => d.date);
+        const labels = combined.map(d => d.day);
         const bookings = combined.map(d => d.bookings);
         const cancellations = combined.map(d => d.cancellations);
         const adjustedDemand = combined.map(d => d.bookings - d.cancellations);
@@ -459,7 +459,7 @@
         const rows = combined.map(d => {
             const net = d.bookings - d.cancellations;
             return `<tr>
-                <td>${d.date}</td>
+                <td>${d.day}</td>
                 <td>${d.type}</td>
                 <td>${d.bookings}</td>
                 <td>${d.cancellations}</td>
