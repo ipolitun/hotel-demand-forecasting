@@ -1,47 +1,44 @@
-import os
-from dotenv import load_dotenv
+from datetime import datetime
+from sqlalchemy import create_engine, DateTime, func
+from sqlalchemy.orm import sessionmaker, DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from shared.db_config import database_config
 
-load_dotenv()
 
-# Конфигурация подключения к БД
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_HOST = os.getenv("DB_HOST", "db")
-DB_PORT = os.getenv("DB_PORT", "5432")
-DB_NAME = os.getenv("DB_NAME")
+# === Синхронное подключение ===
+sync_engine = create_engine(database_config.sync_url, echo=False)
+SessionLocal = sessionmaker(bind=sync_engine, autocommit=False, autoflush=False)
 
-DB_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-ASYNC_DB_URL = DB_URL.replace("postgresql://", "postgresql+asyncpg://")
-
-# Базовый класс моделей
-Base = declarative_base()
-
-# Синхронное подключение
-engine = create_engine(DB_URL, echo=False, future=True)
-SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 def get_sync_session():
     """Dependency для FastAPI (sync)."""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    with SessionLocal() as session:
+        yield session
 
-# Асинхронное подключение
-async_engine = create_async_engine(ASYNC_DB_URL, echo=False, future=True)
-AsyncSessionLocal = sessionmaker(bind=async_engine, class_=AsyncSession, expire_on_commit=False)
+
+# === Асинхронное подключение ===
+async_engine = create_async_engine(database_config.async_url, echo=False)
+AsyncSessionLocal = async_sessionmaker(bind=async_engine, class_=AsyncSession, expire_on_commit=False)
+
 
 async def get_async_session():
     """Dependency для FastAPI (async)."""
     async with AsyncSessionLocal() as session:
         yield session
 
+
 async def init_models():
     """Создание всех таблиц в БД (async)."""
-    async with async_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    async with async_engine.begin() as session:
+        await session.run_sync(Base.metadata.create_all)
+
+
+# === Базовый класс для всех моделей ===
+class Base(DeclarativeBase):
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+

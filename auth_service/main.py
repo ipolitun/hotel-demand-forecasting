@@ -5,9 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from shared.db import get_async_session
-from shared.models import Hotel
+from shared.db_models import Hotel
 from shared.errors import register_error_handlers, setup_openapi_with_errors, AuthorizationError, register_errors
-from auth_service.config import SCHEDULER_KEY
+from auth_service.config import auth_config
 from auth_service.utils import create_access_token
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ async def generate_system_token(
     """
     Генерация токена для системного планировщика.
     """
-    if x_system_key != SCHEDULER_KEY:
+    if x_system_key != auth_config.scheduler_key:
         logger.warning("Попытка генерации токена с неверным системным ключом")
         raise AuthorizationError("Invalid system key")
 

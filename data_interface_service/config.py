@@ -1,3 +1,9 @@
-from dotenv import load_dotenv
+from shared.base_config import ConfigBase
+from shared.db_config import DatabaseConfig
 
-load_dotenv()
+
+class DataInterfaceConfig(ConfigBase):
+    database: DatabaseConfig = DatabaseConfig()
+
+
+data_interface_config = DataInterfaceConfig()

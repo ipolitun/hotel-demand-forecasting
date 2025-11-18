@@ -1,12 +1,21 @@
-import os
-from dotenv import load_dotenv
+from pydantic import field_validator
+from shared.base_config import ConfigBase
+from shared.db_config import DatabaseConfig
 
-load_dotenv()
 
-ALGORITHM = os.getenv("ALGORITHM")
-SECRET_KEY = os.getenv("SECRET_KEY")
-SCHEDULER_KEY = os.getenv("SCHEDULER_KEY")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 60))
+class AuthServiceConfig(ConfigBase):
+    database: DatabaseConfig = DatabaseConfig()
 
-if not SCHEDULER_KEY:
-    raise RuntimeError("SCHEDULER_KEY is not set in the environment")
+    secret_key: str
+    algorithm: str = "HS256"
+    scheduler_key: str
+    access_token_expire_minutes: int = 60
+
+    @field_validator("scheduler_key", mode="before")
+    def ensure_scheduler_key(cls, v):
+        if not v:
+            raise ValueError("SCHEDULER_KEY is required for auth_service")
+        return v
+
+
+auth_config = AuthServiceConfig()
