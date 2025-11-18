@@ -1,5 +1,12 @@
 version: '3.9'
 
+x-db-env: &db_env
+  DB_USER: ${DB_USER}
+  DB_PASSWORD: ${DB_PASSWORD}
+  DB_HOST: ${DB_HOST}
+  DB_PORT: ${DB_PORT}
+  DB_NAME: ${DB_NAME}
+
 services:
 
   db:
@@ -7,9 +14,7 @@ services:
     container_name: hotel_postgres
     restart: always
     environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
+       <<: *db_env
     volumes:
       - pg_data:/var/lib/postgresql/data
     ports:
@@ -30,8 +35,6 @@ services:
       dockerfile: router/Dockerfile
     container_name: router
     restart: always
-    depends_on:
-      - db
     environment:
       PREDICTION_SERVICE_URL: ${PREDICTION_SERVICE_URL}
       AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
@@ -40,15 +43,9 @@ services:
       SCHEDULER_KEY: ${SCHEDULER_KEY}
       SECRET_KEY: ${SECRET_KEY}
       ALGORITHM: ${ALGORITHM}
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
-      DB_HOST: ${DB_HOST}
-      DB_PORT: ${DB_PORT}
     ports:
       - "8001:8000"
     volumes:
-      - ./database:/database
       - ./shared:/shared
 
   prediction_service:
@@ -64,11 +61,7 @@ services:
     volumes:
       - ./shared:/shared
     environment:
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
-      DB_HOST: ${DB_HOST}
-      DB_PORT: ${DB_PORT}
+      <<: *db_env
 
   auth_service:
     build:
@@ -83,11 +76,7 @@ services:
     volumes:
       - ./shared:/shared
     environment:
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
-      DB_HOST: ${DB_HOST}
-      DB_PORT: ${DB_PORT}
+      <<: *db_env
       SCHEDULER_KEY: ${SCHEDULER_KEY}
       SECRET_KEY: ${SECRET_KEY}
       ALGORITHM: ${ALGORITHM}
@@ -104,13 +93,8 @@ services:
       - "8004:8003"
     volumes:
       - ./shared:/shared
-      - ./database:/database
     environment:
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
-      DB_HOST: ${DB_HOST}
-      DB_PORT: ${DB_PORT}
+      <<: *db_env
 
   scheduler_service:
     build:
@@ -125,12 +109,23 @@ services:
     volumes:
       - ./shared:/shared
     environment:
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
-      DB_HOST: ${DB_HOST}
-      DB_PORT: ${DB_PORT}
+      <<: *db_env
       ROUTER_SERVICE_URL: ${ROUTER_SERVICE_URL}
+
+  scripts:
+    build:
+      context: .
+      dockerfile: scripts/Dockerfile
+    container_name: scripts
+    depends_on:
+      - db
+    environment:
+      <<: *db_env
+    volumes:
+      - ./scripts:/app/scripts
+      - ./shared:/app/shared
+      - ./data_import:/app/data_import
+    working_dir: /app
 
 volumes:
   pg_data:
