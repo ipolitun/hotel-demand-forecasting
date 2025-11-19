@@ -27,7 +27,7 @@ setup_openapi_with_errors(app)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[f"{router_config.data_interface_service_url}"],
+    allow_origins=[f"{router_config.frontend_url}"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
