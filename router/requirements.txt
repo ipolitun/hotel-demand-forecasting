@@ -2,10 +2,10 @@ fastapi
 uvicorn
 requests
 sqlalchemy
-python-dotenv
-psycopg2-binary
-python-jose
 pandas
 python-multipart
 httpx
+python-jose
+psycopg2-binary
 asyncpg
+pydantic_settings

@@ -19,7 +19,7 @@ def trigger_forecast():
         return
 
     today = datetime.utcnow().date()
-    target_date = min(today, date.fromisoformat(scheduler_config.max_data_date))
+    target_date = min(today, scheduler_config.max_data_date)
 
     for hotel_id in hotel_ids:
         for has_deposit in [False]:

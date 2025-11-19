@@ -1,10 +1,10 @@
-from pydantic import field_validator
+from pydantic import field_validator, Field
 from shared.base_config import ConfigBase
 from shared.db_config import DatabaseConfig
 
 
 class AuthServiceConfig(ConfigBase):
-    database: DatabaseConfig = DatabaseConfig()
+    database: DatabaseConfig = Field(default_factory=DatabaseConfig)
 
     secret_key: str
     algorithm: str = "HS256"

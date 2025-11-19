@@ -5,7 +5,7 @@ numpy
 joblib
 fastapi
 uvicorn
-psycopg2-binary
 sqlalchemy
-python-dotenv
+psycopg2-binary
 asyncpg
+pydantic_settings

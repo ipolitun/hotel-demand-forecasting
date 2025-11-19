@@ -52,7 +52,8 @@ async def import_bookings(
     )
     added = await save_bookings_to_db(
         db=db,
-        bookings=bookings
+        bookings_data=bookings,
+        hotel_id=hotel.id,
     )
 
     logger.info(

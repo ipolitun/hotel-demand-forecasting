@@ -4,7 +4,7 @@ import logging
 from typing import Tuple, Dict
 from torch.nn import Module
 
-from prediction_service.config import MODEL_DIR
+from prediction_service.config import prediction_config
 from prediction_service.core.gru_model import GRUForecaster
 from shared.errors import (
     ServiceError,
@@ -23,7 +23,7 @@ def load_model_config(hotel_id: int) -> dict:
     Returns:
         dict: словарь с параметрами модели.
     """
-    config_path = MODEL_DIR / f"hotel_{hotel_id}/model_config.json"
+    config_path = prediction_config.model_dir / f"hotel_{hotel_id}/model_config.json"
     if not config_path.exists():
         raise ModelNotFoundError(f"Конфигурация модели не найдена: {config_path}")
 
@@ -70,7 +70,7 @@ def load_model_and_config(hotel_id: int) -> Tuple[Module, dict]:
     except Exception as e:
         raise ModelConfigError(f"Ошибка в формате embedding_sizes: {e}")
 
-    model_path = MODEL_DIR / f"hotel_{hotel_id}/model.pt"
+    model_path = prediction_config.model_dir / f"hotel_{hotel_id}/model.pt"
     if not model_path.exists():
         raise ModelNotFoundError(f"Файл модели не найден: {model_path}")
 

@@ -2,7 +2,7 @@ fastapi
 apscheduler
 httpx
 uvicorn
-python-dotenv
 sqlalchemy
 psycopg2-binary
 asyncpg
+pydantic_settings

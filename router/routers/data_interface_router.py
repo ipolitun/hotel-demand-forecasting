@@ -50,7 +50,7 @@ async def import_bookings(
 
     file_content = await file.read()
     files = {"file": (file.filename, file_content, file.content_type)}
-    headers = {"X-Hotel-Id": int(hotel_id)}
+    headers = {"X-Hotel-Id": str(hotel_id)}
 
     try:
         response = await client.post(
@@ -106,7 +106,7 @@ async def fetch_forecast(
     if not hotel_id:
         logger.warning("Попытка получения прогноза без hotel_id в токене")
         raise AuthorizationError("Отсутствует hotel_id в токене")
-    headers = {"X-Hotel-Id": int(hotel_id)}
+    headers = {"X-Hotel-Id": str(hotel_id)}
 
     try:
         response = await client.post(
