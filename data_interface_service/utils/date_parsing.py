@@ -19,6 +19,39 @@ EN_MONTH_MAP = {
     'sep': 9, 'sept': 9, 'oct': 10, 'nov': 11, 'dec': 12,
 }
 
+SUPPORTED_DATE_FORMATS = [
+    "%d.%m.%Y",
+    "%d.%m.%y",
+    "%d-%m-%Y",
+    "%d-%m-%y",
+    "%d/%m/%Y",
+    "%d/%m/%y",
+    "%Y-%m-%d",
+]
+
+
+def _try_parse_multiple_formats(series: pd.Series) -> pd.Series:
+    """
+    Пытается распарсить серию по всем известным форматам.
+    Возвращает серию с датами или NaT.
+    """
+    parsed = pd.to_datetime(series, errors="coerce", dayfirst=True)
+
+    mask = parsed.isna()
+    if not mask.any():
+        return parsed
+
+    # Пробуем явные форматы
+    for fmt in SUPPORTED_DATE_FORMATS:
+        parsed2 = pd.to_datetime(series[mask], format=fmt, errors="coerce")
+        parsed.loc[mask] = parsed2
+        mask = parsed.isna()
+        if not mask.any():
+            return parsed
+
+    return parsed
+
+
 def _normalize_month(x):
     """Преобразует строковое название месяца в номер, с поддержкой RU/EN."""
     if isinstance(x, str):
@@ -39,37 +72,40 @@ def _normalize_month(x):
 
 def parse_dates_vectorized(df: pd.DataFrame) -> pd.Series:
     """
-    Парсер даты:
-    1) пробует arrival_date,
-    2) для нераспарсенных строк собирает составную дату,
-    3) если все варианты не дают дату — ошибка.
+    Универсальный парсер дат, поддерживающий разные форматы, RU/EN слова и составные поля.
     """
-    # 1. arrival_date
+
+    # --- Если arrival_date существует — пробуем все форматы ---
     if "arrival_date" in df.columns:
-        parsed = pd.to_datetime(df["arrival_date"], errors="coerce")
+        primary = _try_parse_multiple_formats(df["arrival_date"].astype(str))
     else:
-        parsed = pd.Series(pd.NaT, index=df.index)
+        primary = pd.Series(pd.NaT, index=df.index)
 
-    mask = parsed.isna()
+    mask = primary.isna()
 
-    # 2. составная дата
+    # --- Составная дата — если есть три поля year/month/day ---
     if mask.any():
-        months = df.loc[mask, "arrival_date_month"].map(_normalize_month)
+        required = ["arrival_date_year", "arrival_date_month", "arrival_date_day_of_month"]
+        if all(col in df.columns for col in required):
 
-        composed = (
-            df.loc[mask, "arrival_date_year"].astype(str)
-            + "-" + months.astype(str)
-            + "-" + df.loc[mask, "arrival_date_day_of_month"].astype(str)
-        )
+            months = df.loc[mask, "arrival_date_month"].map(_normalize_month)
 
-        composed_parsed = pd.to_datetime(composed, errors="coerce")
-        parsed.loc[mask] = composed_parsed
+            composed = (
+                df.loc[mask, "arrival_date_year"].astype(str)
+                + "-" + months.astype(str)
+                + "-" + df.loc[mask, "arrival_date_day_of_month"].astype(str)
+            )
 
-    # 3. финальная проверка
-    if parsed.isna().any():
-        bad_rows = parsed[parsed.isna()].index.tolist()
+            parsed_composed = pd.to_datetime(composed, errors="coerce")
+            primary.loc[mask] = parsed_composed
+
+            mask = primary.isna()
+
+    # --- Финальная проверка ---
+    if mask.any():
+        idx = mask[mask].index.tolist()
         raise CSVProcessingError(
-            f"Не удалось распарсить дату. Проблемные строки: {bad_rows[:5]}..."
+            f"Не удалось распарсить даты. Некорректные строки: {idx[:10]}"
         )
 
-    return parsed.dt.date
+    return primary.dt.date
