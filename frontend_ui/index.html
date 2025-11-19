@@ -188,7 +188,7 @@
         forecastOutput.classList.add('hidden');
 
         try {
-            const response = await fetch("http://localhost:8001/fetch-forecast", {
+            const response = await fetch("http://localhost:8001/data/fetch-forecast", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -276,7 +276,7 @@
         formData.append("file", file);
 
         try {
-            const response = await fetch("http://localhost:8001/import-bookings", {
+            const response = await fetch("http://localhost:8001/data/import-bookings", {
                 method: "POST",
                 headers: {
                     "Authorization": `Bearer ${token}`
