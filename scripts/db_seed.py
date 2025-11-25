@@ -1,36 +1,31 @@
 """
-Полный reset БД: DROP → CREATE → SEED.
+Заполнение базы минимальным тестовым набором данных.
 Используется только для разработки.
 """
+import asyncio
 
 import logging
 from datetime import date
 
-from shared.db import sync_engine, SessionLocal, Base
+from shared.db import async_engine, AsyncSessionLocal, Base
 from shared.db_models import City, Hotel, Holiday, Weather, Booking, Prediction
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def reset_and_seed():
-    logger.info("Пересоздание схемы БД...")
+async def seed_initial_data():
+    """Добавляет минимальный набор тестовых данных в уже созданную схему БД."""
+    logger.info("Добавление тестовых данных...")
 
-    # DROP ALL
-    Base.metadata.drop_all(bind=sync_engine)
-    # CREATE ALL
-    Base.metadata.create_all(bind=sync_engine)
-
-    logger.info("Схема создана. Добавление тестовых данных...")
-
-    with SessionLocal() as session:
+    async with AsyncSessionLocal() as session:
 
         # === Города ===
         city1 = City(name="Moscow", latitude=55.7558, longitude=37.6173, region="Moscow")
         city2 = City(name="Sochi", latitude=43.5855, longitude=39.7231, region="Krasnodar")
         city3 = City(name="Kazan", latitude=55.7963, longitude=49.1088, region="Tatarstan")
         session.add_all([city1, city2, city3])
-        session.flush()
+        await session.flush()
 
         # === Отели ===
         hotel1 = Hotel(name="Hotel A", city=city1, is_city_hotel=True,
@@ -41,7 +36,7 @@ def reset_and_seed():
                        api_key="6e3abf3296c4461bb4faed78a9c7c412")
 
         session.add_all([hotel1, hotel2, hotel3])
-        session.flush()
+        await session.flush()
 
         # === Праздники ===
         holidays = [
@@ -65,21 +60,21 @@ def reset_and_seed():
         # === Бронирования ===
         bookings = [
             Booking(
-                hotel=hotel1, arrival_date=date(2025, 1, 10),
+                hotel=hotel1, booking_ref = "1", arrival_date=date(2025, 1, 10),
                 lead_time=20, adr=100.0,total_guests=2, total_nights=3,
                 booking_changes=0, has_deposit=False, is_cancellation=False,
                 market_segment="Online", distribution_channel="Direct",
                 reserved_room_type="A", day_of_week=4
             ),
             Booking(
-                hotel=hotel2, arrival_date=date(2025, 1, 15),
+                hotel=hotel2, booking_ref = "1", arrival_date=date(2025, 1, 15),
                 lead_time=5, adr=70.0, total_guests=4, total_nights=2,
                 booking_changes=1, has_deposit=True, is_cancellation=False,
                 market_segment="Online", distribution_channel="TA",
                 reserved_room_type="B", day_of_week=2
             ),
             Booking(
-                hotel=hotel3, arrival_date=date(2025, 1, 20),
+                hotel=hotel3, booking_ref = "1", arrival_date=date(2025, 1, 20),
                 lead_time=10, adr=150.0, total_guests=1, total_nights=1,
                 booking_changes=0, has_deposit=False, is_cancellation=True,
                 market_segment="Corporate", distribution_channel="TO",
@@ -99,10 +94,14 @@ def reset_and_seed():
         ]
         session.add_all(predictions)
 
-        session.commit()
+        await session.commit()
 
-    logger.info("База данных успешно пересоздана и заполнена.")
+    logger.info("База заполнена тестовыми данными.")
+
+
+async def main():
+    await seed_initial_data()
 
 
 if __name__ == "__main__":
-    reset_and_seed()
+    asyncio.run(main())
