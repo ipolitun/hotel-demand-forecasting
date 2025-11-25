@@ -2,13 +2,16 @@
 Импорт данных о бронированиях из CSV в базу данных.
 Используется для первичного наполнения таблицы Booking.
 """
+import asyncio
 
 import pandas as pd
 from datetime import date
-from sqlalchemy.orm import Session
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.db_models import Booking, Hotel
-from shared.db import SessionLocal
+from shared.db import AsyncSessionLocal
 
 
 def make_date(record: pd.Series) -> date:
@@ -40,12 +43,14 @@ def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def load_bookings_from_csv(csv_path: str, db: Session) -> int:
+async def load_bookings_from_csv(csv_path: str, session: AsyncSession) -> int:
     """Загружает бронирования из CSV в таблицу Booking."""
     df = pd.read_csv(csv_path)
     df = preprocess_dataframe(df)
 
-    hotels = {h.name: h for h in db.query(Hotel).all()}
+    # === Асинхронная загрузка отелей ===
+    result = await session.execute(select(Hotel))
+    hotels = {h.name: h for h in result.scalars().all()}
 
     bookings: list[Booking] = []
 
@@ -80,21 +85,42 @@ def load_bookings_from_csv(csv_path: str, db: Session) -> int:
                 distribution_channel=row["distribution_channel"],
                 reserved_room_type=row["reserved_room_type"],
                 day_of_week=arrival.weekday(),
+                # booking_ref будет сгенерирован позже
             )
         )
 
-    db.add_all(bookings)
-    db.commit()
+    session.add_all(bookings)
+    await session.commit()
     return len(bookings)
 
 
-def main() -> None:
+async def assign_booking_refs(session: AsyncSession) -> None:
+    """Генерирует booking_ref для каждой группы записей по hotel_id."""
+    result = await session.execute(select(Hotel.id))
+    hotel_ids = result.scalars().all()
+
+    for hotel_id in hotel_ids:
+        res = await session.execute(
+            select(Booking)
+            .where(Booking.hotel_id == hotel_id)
+            .order_by(Booking.id)
+        )
+        rows = res.scalars().all()
+
+        for idx, booking in enumerate(rows, start=2):
+            booking.booking_ref = str(idx)
+
+    await session.commit()
+
+
+async def main() -> None:
     """Точка входа: загрузка CSV-файла бронирований в БД."""
     csv_path = "data_import/hotel_bookings.csv"
-    with SessionLocal() as session:
-        count = load_bookings_from_csv(csv_path, session)
+    async with AsyncSessionLocal() as session:
+        count = await load_bookings_from_csv(csv_path, session)
+        await assign_booking_refs(session)
         print(f"Загружено {count} записей из {csv_path}")
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

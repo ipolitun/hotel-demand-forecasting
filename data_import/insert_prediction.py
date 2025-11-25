@@ -4,12 +4,12 @@
 Генерирует предсказания на основе исторических данных с добавлением
 случайного шума (нормального распределения) и записывает их в базу данных.
 """
-
-from datetime import datetime, date
+import asyncio
+from datetime import datetime
 import numpy as np
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.db import SessionLocal
+from shared.db import AsyncSessionLocal
 from shared.db_models import Prediction
 
 
@@ -62,7 +62,7 @@ def generate_predictions() -> list[dict]:
     return predictions
 
 
-def insert_predictions(hotel_id: int, has_deposit: bool, db: Session) -> int:
+async def insert_predictions(hotel_id: int, has_deposit: bool, session: AsyncSession) -> int:
     """
     Вставляет сгенерированные прогнозы в таблицу Prediction.
     Возвращает количество добавленных записей.
@@ -80,21 +80,21 @@ def insert_predictions(hotel_id: int, has_deposit: bool, db: Session) -> int:
         for entry in records
     ]
 
-    db.add_all(objects)
-    db.commit()
+    session.add_all(objects)
+    await session.commit()
 
     print(f"Добавлено {len(objects)} записей в таблицу prediction для hotel_id={hotel_id}")
     return len(objects)
 
 
-def main() -> None:
+async def main() -> None:
     """Точка входа для одиночного запуска скрипта."""
     hotel_id = 1
     has_deposit = False
 
-    with SessionLocal() as session:
-        insert_predictions(hotel_id, has_deposit, session)
+    async with AsyncSessionLocal() as session:
+        await insert_predictions(hotel_id, has_deposit, session)
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
