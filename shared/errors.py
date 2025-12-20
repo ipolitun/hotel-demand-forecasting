@@ -36,6 +36,12 @@ class AuthorizationError(ServiceError):
     message = "Неверный идентификатор отеля или API-ключ"
 
 
+class NotFoundError(ServiceError):
+    status_code = status.HTTP_404_NOT_FOUND
+    type = "NotFoundError"
+    message = "Данные не найдены"
+
+
 class ValidationError(ServiceError):
     status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
     type = "ValidationError"
@@ -132,9 +138,14 @@ def register_error_handlers(app: FastAPI):
     async def add_trace_id_middleware(request: Request, call_next):
         trace_id = str(uuid.uuid4())
         request.state.trace_id = trace_id
-        response = await call_next(request)
-        response.headers["X-Trace-ID"] = trace_id
-        return response
+
+        try:
+            response = await call_next(request)
+        except Exception:
+            raise
+        else:
+            response.headers["X-Trace-ID"] = trace_id
+            return response
 
     # --- Обработка предсказуемых (контролируемых) ошибок ---
     @app.exception_handler(ServiceError)

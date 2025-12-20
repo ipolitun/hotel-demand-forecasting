@@ -22,6 +22,21 @@ services:
     ports:
       - "5432:5432"
 
+  redis:
+    image: redis:7
+    container_name: redis
+    restart: always
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    command:
+      [
+        "redis-server",
+        "--appendonly", "yes",
+        "--appendfsync", "everysec"
+      ]
+
   migrations:
     build:
       context: .
@@ -61,8 +76,8 @@ services:
       SCHEDULER_SERVICE_URL: ${SCHEDULER_SERVICE_URL}
       FRONTEND_URL: ${FRONTEND_URL}
       SCHEDULER_KEY: ${SCHEDULER_KEY}
-      SECRET_KEY: ${SECRET_KEY}
-      ALGORITHM: ${ALGORITHM}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_HASH_ALGORITHM: ${JWT_HASH_ALGORITHM}
     ports:
       - "8001:8000"
     volumes:
@@ -91,6 +106,8 @@ services:
     container_name: auth_service
     restart: always
     depends_on:
+      redis:
+        condition: service_started
       migrations:
         condition: service_completed_successfully
     ports:
@@ -99,9 +116,13 @@ services:
       - ./shared:/shared
     environment:
       <<: *db_env
-      SCHEDULER_KEY: ${SCHEDULER_KEY}
-      SECRET_KEY: ${SECRET_KEY}
-      ALGORITHM: ${ALGORITHM}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_HASH_ALGORITHM: ${JWT_HASH_ALGORITHM}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+      REFRESH_TOKEN_EXPIRE_MINUTES: ${REFRESH_TOKEN_EXPIRE_MINUTES}
+      PASSWORD_HASH_ALGORITHM: ${PASSWORD_HASH_ALGORITHM}
 
   data_interface_service:
     build:
@@ -153,3 +174,4 @@ services:
 
 volumes:
   pg_data:
+  redis-data:

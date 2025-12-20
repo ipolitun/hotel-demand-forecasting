@@ -2,7 +2,11 @@ fastapi
 uvicorn
 sqlalchemy
 pydantic
+pydantic[email]
+pydantic_settings
 python-jose
 psycopg2-binary
 asyncpg
-pydantic_settings
+bcrypt==3.2.2
+passlib[bcrypt]==1.7.4
+redis

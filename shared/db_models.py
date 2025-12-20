@@ -1,8 +1,9 @@
-from sqlalchemy import Numeric, ForeignKey, text
+from sqlalchemy import Numeric, ForeignKey, text, Enum as SqlEnum, UniqueConstraint
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from datetime import date
 
 from shared.db import Base
+from shared.enums import UserRole, SystemRole
 
 
 class City(Base):
@@ -15,6 +16,47 @@ class City(Base):
 
     hotels: Mapped[list["Hotel"]] = relationship(back_populates="city")
     weather: Mapped[list["Weather"]] = relationship(back_populates="city")
+
+
+class User(Base):
+    __tablename__ = "user"
+
+    name: Mapped[str] = mapped_column(nullable=False)
+    surname: Mapped[str] = mapped_column(nullable=False)
+    email: Mapped[str] = mapped_column(unique=True, nullable=False)
+    hashed_password: Mapped[str] = mapped_column(nullable=False)
+    is_active: Mapped[bool] = mapped_column(nullable=False, default=True)
+
+    system_role: Mapped[SystemRole] = mapped_column(
+        SqlEnum(SystemRole, name="system_role"),
+        nullable=False,
+        server_default=SystemRole.user.value,
+    )
+
+    hotels: Mapped[list["UserHotel"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+
+
+class UserHotel(Base):
+    __tablename__ = "user_hotel"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False)
+    hotel_id: Mapped[int] = mapped_column(ForeignKey("hotel.id"), nullable=False)
+
+    role: Mapped[UserRole] = mapped_column(
+        SqlEnum(UserRole, name="user_role"),
+        nullable=False,
+        server_default=UserRole.viewer.value
+    )
+
+    user: Mapped["User"] = relationship(back_populates="hotels")
+    hotel: Mapped["Hotel"] = relationship(back_populates="users")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "hotel_id", name="uq_user_hotel"),
+    )
 
 
 class Hotel(Base):
@@ -32,6 +74,10 @@ class Hotel(Base):
     )
     predictions: Mapped[list["Prediction"]] = relationship(
         back_populates="hotel", cascade="all, delete-orphan"
+    )
+    users: Mapped[list["UserHotel"]] = relationship(
+        back_populates="hotel",
+        cascade="all, delete-orphan"
     )
 
 
