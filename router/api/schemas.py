@@ -1,30 +1,25 @@
 from datetime import date
 from enum import Enum
 from typing import List, Optional
+
 from pydantic import BaseModel, Field, EmailStr
 
 
 # === AUTH ===
 class UserLoginRequest(BaseModel):
-    """
-    Запрос на вход пользователя по email и паролю.
-    """
+    """Запрос на вход пользователя по email и паролю."""
     email: EmailStr = Field(..., description="Email пользователя.")
     password: str = Field(..., max_length=32, description="Пароль пользователя.", min_length=8)
 
 
 class PasswordUpdateRequest(BaseModel):
-    """
-    Запрос на смену пароля пользователя.
-    """
-    current_password: str = Field(..., min_length=8, max_length= 32, description="Текущий пароль пользователя.")
+    """Запрос на смену пароля пользователя."""
+    current_password: str = Field(..., min_length=8, max_length=32, description="Текущий пароль пользователя.")
     new_password: str = Field(..., min_length=8, max_length=32, description="Новый пароль пользователя.")
 
 
 class UserRegisterRequest(BaseModel):
-    """
-    Запрос на регистрацию нового пользователя.
-    """
+    """ Запрос на регистрацию нового пользователя."""
     email: EmailStr = Field(..., description="Уникальный Email пользователя")
     password: str = Field(..., min_length=8, max_length=32, description="Пароль пользователя.")
     name: str = Field(..., description="Имя пользователя.")
@@ -32,31 +27,26 @@ class UserRegisterRequest(BaseModel):
 
 
 class UserRegisterResponse(BaseModel):
-    """
-    Ответ с данными зарегистрированного пользователя.
-    """
+    """Ответ с данными зарегистрированного пользователя."""
     id: int = Field(..., description="Уникальный идентификатор пользователя в системе.")
-    email: EmailStr =Field(..., description="Email пользователя.")
+    email: EmailStr = Field(..., description="Email пользователя.")
     name: str = Field(..., description="Имя пользователя.")
-    surname: str =  Field(..., description="Фамилия пользователя.")
+    surname: str = Field(..., description="Фамилия пользователя.")
     is_active: bool = Field(..., description="Флаг активности пользователя.")
 
 
 # === DATA INTERFACE (загрузка бронирований и чтение сохранённых прогнозов) ===
 class HotelUserRole(str, Enum):
+    """Роль пользователя в отеле"""
     owner = "owner"
     manager = "manager"
     viewer = "viewer"
 
 
 class AccessibleHotel(BaseModel):
-    """
-    Hotel access descriptor extracted from access JWT.
-
-    Used by API Gateway to validate and propagate hotel context.
-    """
-    id: int
-    user_role: HotelUserRole
+    """Отель, доступный пользователю согласно access-токену"""
+    id: int = Field(..., description="Идентификатор отеля, к которому пользователь имеет доступ.")
+    user_role: HotelUserRole = Field(..., description="Роль пользователя в данном отеле.")
 
 
 class ForecastRequest(BaseModel):
