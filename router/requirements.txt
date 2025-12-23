@@ -1,11 +1,13 @@
 fastapi
 uvicorn
 requests
-sqlalchemy
 pandas
 python-multipart
 httpx
 python-jose
+pydantic
+pydantic[email]
+pydantic_settings
 psycopg2-binary
 asyncpg
-pydantic_settings
+sqlalchemy
