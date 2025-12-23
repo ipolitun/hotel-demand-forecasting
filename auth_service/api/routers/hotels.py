@@ -1,9 +1,7 @@
-from fastapi import Depends, APIRouter
+from fastapi import APIRouter
 from starlette import status
 
-from auth_service.api.dependencies import get_principal, get_uow
-from auth_service.repositories.unit_of_work import IUnitOfWork
-from auth_service.schemas.auth import AuthPrincipal
+from auth_service.api.dependencies import UoWDep, AuthPrincipalDep
 from auth_service.schemas.hotel import HotelShow, HotelCreate
 from auth_service.use_cases.registration import register_hotel_with_owner
 
@@ -21,8 +19,8 @@ router = APIRouter()
 @register_errors(AuthorizationError)
 async def register_hotel_endpoint(
         data: HotelCreate,
-        principal: AuthPrincipal = Depends(get_principal),
-        uow: IUnitOfWork = Depends(get_uow),
+        principal: AuthPrincipalDep,
+        uow: UoWDep,
 ):
     return await register_hotel_with_owner(
         uow=uow,

@@ -26,7 +26,10 @@ async def logout_all(
 ) -> None:
     payload = await auth.read_token(refresh_token)
 
-    if payload.sub != user_id:
+    if not isinstance(payload, TokenRefreshPayload):
+        raise AuthorizationError("Invalid refresh token")
+
+    if payload.sub != str(user_id):
         raise AuthorizationError("Invalid refresh token")
 
     await auth.revoke_all_tokens(str(user_id))

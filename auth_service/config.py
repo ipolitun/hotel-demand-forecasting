@@ -1,4 +1,4 @@
-from pydantic import field_validator, Field
+from pydantic import Field
 from pydantic_settings import SettingsConfigDict
 
 from shared.base_config import ConfigBase

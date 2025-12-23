@@ -1,4 +1,5 @@
 import json
+from typing import Annotated
 
 from fastapi import Depends, Header, Cookie
 
@@ -35,7 +36,22 @@ def get_token_auth_service(
     )
 
 
-def get_principal(
+def _parse_hotels_header(x_hotels: str) -> list[HotelAccessPayload]:
+    try:
+        raw_hotels = json.loads(x_hotels)
+    except json.JSONDecodeError as exc:
+        raise AuthorizationError("Invalid X-Hotels header format") from exc
+
+    if not isinstance(raw_hotels, list):
+        raise AuthorizationError("X-Hotels header must be a list")
+
+    try:
+        return [HotelAccessPayload(**item) for item in raw_hotels]
+    except (TypeError, ValueError) as exc:
+        raise AuthorizationError("Invalid X-Hotels header payload") from exc
+
+
+def get_auth_principal(
         x_user_id: int = Header(..., alias="X-User-Id"),
 ) -> AuthPrincipal:
     return AuthPrincipal(user_id=x_user_id)
@@ -46,10 +62,7 @@ def get_hotel_principal(
         x_system_role: SystemRole = Header(..., alias="X-System-Role"),
         x_hotels: str = Header(..., alias="X-Hotels"),
 ) -> HotelPrincipal:
-    hotels = [
-        HotelAccessPayload(**item)
-        for item in json.loads(x_hotels)
-    ]
+    hotels = _parse_hotels_header(x_hotels)
 
     return HotelPrincipal(
         user_id=x_user_id,
@@ -64,3 +77,12 @@ def get_refresh_cookie(
     if not refresh_token:
         raise AuthorizationError("Refresh token missing")
     return refresh_token
+
+
+UoWDep = Annotated[IUnitOfWork, Depends(get_uow)]
+JWTAuthDep = Annotated[JWTAuthService, Depends(get_token_auth_service)]
+
+AuthPrincipalDep = Annotated[AuthPrincipal, Depends(get_auth_principal)]
+HotelPrincipalDep = Annotated[HotelPrincipal, Depends(get_hotel_principal)]
+
+RefreshTokenDep = Annotated[str, Depends(get_refresh_cookie)]
