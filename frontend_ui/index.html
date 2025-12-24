@@ -8,9 +8,7 @@
         body {
             padding: 2rem;
             background-color: #f9f9f9;
-        }
-        .hidden {
-            display: none;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
         }
         .card {
             width: 70%;
@@ -24,9 +22,28 @@
             margin: auto;
             box-shadow: 0 0.25rem 1rem rgba(0, 0, 0, 0.05);
         }
+        .card, .card-small {
+           background: #fff;
+           border-radius: 16px;
+           border: 1px solid #eef1f6;
+        }
         h3 {
             text-align: center;
         }
+        #chartContainer {
+            height: 420px;
+            width: 100%;
+            position: relative;
+        }
+
+        #forecastChart {
+            width: 100% !important;
+            height: 100% !important;
+        }
+        .hidden { display: none; }
+        .muted { color: #6c757d; font-size: .95rem; }
+        .row-gap { row-gap: 12px; }
+        .code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;  padding: 6px}
     </style>
 </head>
 <body>
@@ -35,23 +52,53 @@
     <!-- Авторизация -->
     <div id="loginSection" class="card-small p-4 mb-4">
         <h3 class="mb-3">Вход в систему</h3>
+
         <div class="mb-3">
-            <input type="text" id="apiKey" class="form-control" placeholder="Введите API ключ">
+            <label for="email" class="form-label">Email</label>
+            <input type="email" id="email" class="form-control" placeholder="name@example.com" autocomplete="username"/>
         </div>
-        <button class="btn btn-primary w-100" onclick="authorize()">Войти</button>
+
+        <div class="mb-3">
+            <label for="password" class="form-label">Пароль</label>
+            <input type="password" id="password" class="form-control" placeholder="••••••••"
+                   autocomplete="current-password"/>
+        </div>
+
+        <button class="btn btn-primary w-100" id="btnLogin">Войти</button>
     </div>
 
     <!-- Главная секция -->
     <div id="mainSection" class="card p-4 hidden">
-        <h3 class="mb-4">Прогнозирование cпроса</h3>
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+            <h3 class="m-0">Прогнозирование спроса</h3>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-secondary" id="btnReloadMe">Обновить профиль</button>
+                <button class="btn btn-outline-danger" id="btnLogout">Выйти</button>
+            </div>
+        </div>
+
+
+        <!-- Profile / hotel context -->
+        <div class="border rounded-3 p-3 mb-4">
+            <div class="row row-gap">
+                <div class="col-12 col-lg-7">
+                    <label for="hotelSelect" class="muted">Отель для операций</label>
+                    <select id="hotelSelect" class="form-select"></select>
+                </div>
+                <div class="col-12 col-lg-5">
+                    <div class="muted">Текущий пользователь</div>
+                    <div id="meInfo" class="code"></div>
+                </div>
+            </div>
+        </div>
 
         <!-- Загрузка файла -->
         <div class="mb-3">
             <label for="csvFile" class="form-label">Загрузите историю бронирований (CSV):</label>
             <input class="form-control" type="file" id="csvFile" accept=".csv">
-<!--            <input class="form-control" type="file" id="csvFile">-->
         </div>
-        <button class="btn btn-outline-primary w-100 mb-3" onclick="uploadCSV()">Загрузить</button>
+        <button class="btn btn-outline-primary w-100 mb-3" id="btnUpload">Загрузить</button>
+
 
         <!-- Настройки прогноза -->
         <div class="mb-3">
@@ -61,7 +108,7 @@
         <div class="mb-3">
             <label class="form-label">Горизонт прогноза:</label>
             <select id="horizon" class="form-select">
-                 <option value="30">1–30 дней</option>
+                <option value="30">1–30 дней</option>
                 <option value="7">1–7 дней</option>
                 <option value="0">Только история</option>
             </select>
@@ -75,7 +122,7 @@
             </select>
         </div>
 
-        <button class="btn btn-primary w-100 mb-3" onclick="fetchForecast()">Получить прогноз</button>
+        <button class="btn btn-primary w-100 mb-3" id="btnFetchForecast">Получить прогноз</button>
 
         <!-- Формат вывода -->
         <div class="mb-3">
@@ -86,14 +133,27 @@
             </select>
         </div>
 
-        <button class="btn btn-primary w-100 mb-4" onclick="renderForecast()">Отобразить</button>
+        <button class="btn btn-primary w-100 mb-4" id="btnRender">Отобразить</button>
 
-        <!-- Результат -->
-        <div id="forecastOutput" class="hidden">
-            <div id="forecastWarning" class="alert alert-warning hidden" role="alert"></div>
-            <div id="forecastTable" class="hidden"></div>
-            <canvas id="forecastChart" class="hidden"></canvas>
-            <div id="historySummary" class="mt-3"></div>
+        <div id="chartContainer" class="mb-4">
+            <canvas id="forecastChart"></canvas>
+        </div>
+
+        <div id="tableContainer" class="hidden">
+            <div class="table-responsive">
+                <table class="table table-striped table-bordered">
+                    <thead>
+                    <tr>
+                        <th>Дата</th>
+                        <th>Спрос</th>
+                        <th>Отмены</th>
+                        <th>Скорректированный спрос</th>
+                        <th>История/Прогноз</th>
+                    </tr>
+                    </thead>
+                    <tbody id="forecastTableBody"></tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>
@@ -102,173 +162,222 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    window.onload = function () {
+    const API_BASE_URL = "http://localhost:8001";
+
+    let lastForecast = null;
+    let chartInstance = null;
+
+    let refreshInProgress = false;
+    let refreshPromise = null;
+
+     function setTodayToDateInput() {
         const today = new Date().toISOString().split('T')[0];
         const dateInput = document.getElementById("forecastDate");
         dateInput.value = today;
         dateInput.max = today;
-    };
+     }
 
+     // === Error parsing (shared.errors contract) ===
+     async function safeJson(response) {
+         try {
+             return await response.json();
+         } catch {
+             return null;
+         }
+     }
 
-    async function authorize() {
-        const key = document.getElementById("apiKey").value.trim();
-        if (!key) {
-            alert("Введите API-ключ.");
+     function handleLogout() {
+         alert("Сессия истекла. Пожалуйста, войдите заново.");
+         setAuthUI(false);
+         lastForecast = null;
+         destroyChart();
+         clearTable();
+     }
+
+     function extractError(payload) {
+        // поддержим оба варианта: {"error": {...}} и {"type": "...", ...}
+        if (!payload) return null;
+        if (payload.error && typeof payload.error === "object") return payload.error;
+        if (payload.type) return payload;
+        return null;
+     }
+
+     function showErrorToUser(err) {
+         if (!err) {
+             alert("❌ Неизвестная ошибка сервера");
+             return;
+         }
+         const type = err.type || "unknown_error";
+         const message = err.message || "Ошибка запроса"
+         switch (type) {
+             case "AuthorizationError":
+                 alert("🔒 Требуется авторизация.");
+                 break;
+             case "CSVProcessingError":
+                 alert(`⚠️ Ошибка обработки CSV: ${message}`);
+                 break;
+            case "MappingError":
+                alert(`⚠️ Ошибка маппинга данных: ${message}`);
+                break;
+            case "ConflictError":
+                alert(`ℹ️ Конфликт данных: ${message}`);
+                break;
+            case "NoForecastError":
+                warningDiv.textContent = "📭 Прогноз отсутствует для выбранного периода.";
+                break;
+            case "InsufficientHistoryError":
+                warningDiv.textContent = "⚠️ Недостаточно исторических данных для прогноза.";
+                break;
+            case "DatabaseError":
+                warningDiv.textContent = "💾 Ошибка базы данных при получении прогноза.";
+                break;
+            default:
+                alert(`❗ ${message}`);
+         }
+     }
+
+    async function apiFetch(path, options = {}, { retryOn401 = true } = {}) {
+        const doRequest = () =>
+            fetch(`${API_BASE_URL}${path}`, {
+                ...options,
+                credentials: "include",
+            });
+
+        let response = await doRequest();
+
+        if (response.status !== 401 || !retryOn401) {
+            return response;
+        }
+
+        const refreshed = await tryRefresh();
+
+        if (!refreshed) {
+            handleLogout();
+            throw new Error("Unauthorized");
+        }
+
+        return doRequest();
+    }
+
+    function getSelectedHotelId() {
+        const value = document.getElementById("hotelSelect").value;
+        if (!value) return null;
+        const id = Number(value);
+        return Number.isFinite(id) ? id : null;
+    }
+
+    function setAuthUI(isAuthed) {
+        document.getElementById("loginSection").classList.toggle("hidden", isAuthed);
+        document.getElementById("mainSection").classList.toggle("hidden", !isAuthed);
+    }
+
+    async function loadMe() {
+        // Нужен proxy endpoint на gateway: GET /auth/me
+        const resp = await apiFetch("/auth/me", { method: "GET" });
+        const me = await resp.json();
+
+        // Отображение пользователя
+        const meInfo = document.getElementById("meInfo");
+        const userId = me.sub ?? me.user_id ?? "?";
+        const role = me.role ?? me.system_role ?? "?";
+        meInfo.textContent = `user_id=${userId} role=${role}`;
+
+        // Заполнение списка отелей
+        const hotels = me.hotels || [];
+        const select = document.getElementById("hotelSelect");
+        select.innerHTML = "";
+
+        if (!Array.isArray(hotels) || hotels.length === 0) {
+            const opt = document.createElement("option");
+            opt.value = "";
+            opt.textContent = "Нет доступных отелей";
+            select.appendChild(opt);
+            select.disabled = true;
+            return;
+        }
+
+        hotels.forEach(h => {
+            const opt = document.createElement("option");
+            opt.value = String(h.id);
+            const roleText = h.user_role ?? h.role ?? "";
+            opt.textContent = roleText ? `Отель #${h.id} (${roleText})` : `Отель #${h.id}`;
+            select.appendChild(opt);
+        });
+
+        select.disabled = false;
+    }
+
+    // === AUTH: login/logout ===
+    async function login() {
+        const email = document.getElementById("email").value.trim();
+        const password = document.getElementById("password").value;
+
+        if (!email || !password) {
+            alert("Введите email и пароль.");
             return;
         }
 
         try {
-            const response = await fetch("http://localhost:8001/auth/login", {
+            await apiFetch("/auth/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ api_key: key }),
+                body: JSON.stringify({ email, password }),
             });
 
-            const result = await response.json().catch(() => ({}));
-
-            if (!response.ok) {
-                // Централизованный формат ошибок ServiceError
-                if (result.error && result.error.type) {
-                    const { type, message } = result.error;
-                    switch (type) {
-                        case "AuthorizationError":
-                            alert("🔒 Ошибка авторизации: " + message);
-                            break;
-                        case "ExternalServiceError":
-                            alert("🌐 Сервис авторизации недоступен: " + message);
-                            break;
-                        default:
-                            alert(`❔ Неизвестная ошибка (${type}): ${message}`);
-                    }
-                } else {
-                    alert("❌ Не удалось выполнить авторизацию.");
-                }
-                return;
-            }
-
-            // ✅ Успешный ответ
-            const token = result.access_token;
-            if (!token) {
-                alert("⚠️ Ошибка: токен не получен.");
-                return;
-            }
-
-            localStorage.setItem("access_token", token);
-
-            document.getElementById("loginSection").classList.add("hidden");
-            document.getElementById("mainSection").classList.remove("hidden");
-
-            alert("✅ Авторизация успешна!");
-        } catch (err) {
-            alert("🚫 Ошибка соединения с сервером: " + err.message);
-            console.error(err);
+            setAuthUI(true);
+            await loadMe();
+            alert("✅ Вход выполнен.");
+        } catch (e) {
+            showErrorToUser(e._serviceError);
+            console.error(e);
         }
     }
 
-
-    async function fetchForecast() {
-        const token = localStorage.getItem("access_token");
-        if (!token) {
-            alert("Вы не авторизованы.");
-            return;
+    async function tryRefresh() {
+        if (refreshInProgress) {
+            return refreshPromise;
         }
 
-        const target_date = document.getElementById('forecastDate').value;
-        const has_deposit = document.getElementById('deposit').value === 'true';
+        refreshInProgress = true;
+        refreshPromise = fetch(`${API_BASE_URL}/auth/refresh`, {
+            method: "POST",
+            credentials: "include"
+        })
+            .then(res => res.ok)
+            .catch(() => false)
+            .finally(() => {
+                refreshInProgress = false;
+            });
 
-        const horizonValue = document.getElementById('horizon').value;
-        const isHistoryOnly = horizonValue === 'history';
-        const horizon = isHistoryOnly ? 0 : parseInt(horizonValue);
+        return refreshPromise;
+    }
 
-        const warningDiv = document.getElementById('forecastWarning');
-        const forecastOutput = document.getElementById('forecastOutput');
-
-        warningDiv.classList.add('hidden');
-        warningDiv.textContent = '';
-        forecastOutput.classList.add('hidden');
-
+    async function logout() {
         try {
-            const response = await fetch("http://localhost:8001/data/fetch-forecast", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-               body: JSON.stringify({
-                   target_date,
-                   horizon,
-                   has_deposit,
-                   history_window: 30
-               })
-            });
-
-            const result = await response.json();
-
-            // Успешный ответ
-            if (response.ok && result.hotel_id !== undefined) {
-                window.forecastData = result.forecast;
-                window.historyData = result.history_summary;
-
-                forecastOutput.classList.remove("hidden");
-                renderForecast();
-                return;
-            }
-
-            // Обработка контролируемых ошибок ServiceError
-            if (result.error && result.error.type) {
-                const { type, message } = result.error;
-
-                switch (type) {
-                    case "AuthorizationError":
-                        alert(`🔒 Ошибка авторизации: ${message}`);
-                        break;
-                    case "NoForecastError":
-                        warningDiv.textContent = "📭 Прогноз отсутствует для выбранного периода.";
-                        break;
-                    case "InsufficientHistoryError":
-                        warningDiv.textContent = "⚠️ Недостаточно исторических данных для прогноза.";
-                        break;
-                    case "DatabaseError":
-                        warningDiv.textContent = "💾 Ошибка базы данных при получении прогноза.";
-                        break;
-                    case "ExternalServiceError":
-                        warningDiv.textContent = "🌐 Ошибка внешнего сервиса прогнозирования.";
-                        break;
-                    default:
-                        warningDiv.textContent = `❔ Неизвестная ошибка (${type}): ${message}`;
-                }
-
-                warningDiv.classList.remove("hidden");
-                forecastOutput.classList.remove("hidden");
-                return;
-            }
-
-            // === Неожиданный ответ ===
-            warningDiv.textContent = "❌ Неожиданный ответ сервера: " + JSON.stringify(result);
-            warningDiv.classList.remove("hidden");
-            forecastOutput.classList.remove("hidden");
-
-        } catch (err) {
-            warningDiv.textContent = "🚫 Ошибка соединения с сервером: " + err.message;
-            warningDiv.classList.remove("hidden");
-            forecastOutput.classList.remove("hidden");
-            console.error(err);
+            await apiFetch("/auth/logout", { method: "POST" }, { retryOn401: false });
+        } catch (e) {
+            // если logout не прошёл, всё равно считаем сессию завершённой на фронте
+            console.warn("Logout failed:", e);
+        } finally {
+            setAuthUI(false);
+            lastForecast = null;
+            destroyChart();
+            clearTable();
         }
     }
 
-
+    // === CSV upload ===
     async function uploadCSV() {
-        const token = localStorage.getItem("access_token");
-        if (!token) {
-            alert("🔑 Вы не авторизованы. Пожалуйста, войдите в систему.");
+        const fileInput = document.getElementById("csvFile");
+        const file = fileInput.files?.[0];
+        if (!file) {
+            alert("Выберите CSV файл.");
             return;
         }
 
-        const fileInput = document.getElementById("csvFile");
-        const file = fileInput?.files?.[0];
-
-        if (!file) {
-            alert("📂 Пожалуйста, выберите CSV-файл для загрузки.");
+        const hotelId = getSelectedHotelId();
+        if (!hotelId) {
+            alert("Выберите отель.");
             return;
         }
 
@@ -276,216 +385,260 @@
         formData.append("file", file);
 
         try {
-            const response = await fetch("http://localhost:8001/data/import-bookings", {
+            const resp = await apiFetch("/data/import-bookings", {
                 method: "POST",
-                headers: {
-                    "Authorization": `Bearer ${token}`
-                },
-                body: formData
+                headers: { "X-Hotel-Id": String(hotelId) },
+                body: formData,
             });
-
-            const result = await response.json().catch(() => ({}));
-
-            // === Успешный ответ ===
-            if (response.ok && result.hotel_id !== undefined) {
-                const added = result.added ?? 0;
-                const skipped = result.duplicates_skipped ?? 0;
-                alert(`✅ Загружено ${added} записей. Пропущено дубликатов: ${skipped}.`);
-                return;
-            }
-
-            // === Контролируемая ошибка из ServiceError ===
-            if (result.error && result.error.type) {
-                const { type, message } = result.error;
-
-                switch (type) {
-                    case "AuthorizationError":
-                        alert(`🔒 Ошибка авторизации: ${message}`);
-                        break;
-                    case "CSVProcessingError":
-                        alert(`⚠️ Ошибка обработки CSV: ${message}`);
-                        break;
-                    case "MappingError":
-                        alert(`⚠️ Ошибка маппинга данных: ${message}`);
-                        break;
-                    case "ConflictError":
-                        alert(`ℹ️ Конфликт данных: ${message}`);
-                        break;
-                    case "DatabaseError":
-                        alert(`💾 Ошибка базы данных: ${message}`);
-                        break;
-                    case "ExternalServiceError":
-                        alert(`🌐 Ошибка внешнего сервиса: ${message}`);
-                        break;
-                    default:
-                        alert(`❔ Неизвестная ошибка (${type}): ${message}`);
-                }
-                return;
-            }
-
-            // === Неожиданный ответ ===
-            alert("❌ Неожиданный ответ сервера: " + JSON.stringify(result));
-
-        } catch (error) {
-            alert("🚫 Ошибка соединения с сервером: " + error.message);
+            const result = await resp.json();
+            alert(`✅ Импорт завершён. Добавлено: ${result.added ?? "?"}, дубликатов пропущено: ${result.duplicates_skipped ?? "?"}`);
+        } catch (e) {
+            showErrorToUser(e._serviceError);
+            console.error(e);
         }
     }
 
-
-    function renderForecast() {
-        const mode = document.getElementById('displayMode').value;
-        const chartCanvas = document.getElementById('forecastChart');
-        const tableContainer = document.getElementById('forecastTable');
-
-        chartCanvas.classList.add('hidden');
-        tableContainer.classList.add('hidden');
-
-        if (!window.forecastData || !window.historyData) {
-            alert("Нет данных для отображения.");
+    // === Forecast fetch ===
+    async function fetchForecast() {
+        const hotelId = getSelectedHotelId();
+        if (!hotelId) {
+            alert("Выберите отель.");
             return;
         }
 
-        if (mode === 'chart') {
-            renderForecastChart();
-        } else {
-            renderForecastTable();
+        const payload = {
+            target_date: document.getElementById("forecastDate").value,
+            horizon: Number(document.getElementById("horizon").value),
+            has_deposit: document.getElementById("deposit").value === "true",
+            history_window: 30,
+        };
+
+        try {
+            const resp = await apiFetch("/data/fetch-forecast", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Hotel-Id": String(hotelId),
+                },
+                body: JSON.stringify(payload),
+            });
+
+            lastForecast = await resp.json();
+            alert("✅ Прогноз получен.");
+        } catch (e) {
+            showErrorToUser(e._serviceError);
+            console.error(e);
         }
     }
 
+    // === Rendering ===
+    function renderForecast() {
+        if (!lastForecast) {
+            alert("Сначала получите прогноз.");
+            return;
+        }
 
-    function renderForecastChart() {
-        const chartCanvas = document.getElementById('forecastChart');
-        const ctx = chartCanvas.getContext('2d');
+        const mode = document.getElementById("displayMode").value;
+        if (mode === "chart") {
+            document.getElementById("chartContainer").classList.remove("hidden");
+            document.getElementById("tableContainer").classList.add("hidden");
+            renderChart(lastForecast);
+        } else {
+            document.getElementById("chartContainer").classList.add("hidden");
+            document.getElementById("tableContainer").classList.remove("hidden");
+            renderTable(lastForecast);
+        }
+    }
 
-        const history = window.historyData;
-        const forecast = window.forecastData;
+    function destroyChart() {
+        if (chartInstance) {
+            chartInstance.destroy();
+            chartInstance = null;
+        }
+    }
 
-        const combined = [...history.map(d => ({...d, type: 'История'})), ...forecast.map(d => ({...d, type: 'Прогноз'}))];
+    function clearTable() {
+        document.getElementById("forecastTableBody").innerHTML = "";
+    }
 
-        const labels = combined.map(d => d.day);
-        const bookings = combined.map(d => d.bookings);
-        const cancellations = combined.map(d => d.cancellations);
-        const adjustedDemand = combined.map(d => d.bookings - d.cancellations);
+    function normalizeForecastData(payload) {
+        const history = payload?.history_summary ?? [];
+        const forecast = payload?.forecast ?? [];
 
-        const horizonValue = document.getElementById('horizon').value;
-        const isHistoryOnly = horizonValue === "0";
-
-        const backgroundBookings = combined.map(d => {
-            if (isHistoryOnly) return 'rgba(65,134,243, 0.6)';
-            return d.type === 'История' ? 'rgba(65,134,243,0.2)' : 'rgba(65,134,243,0.6)';
+        const mapRow = (r, kind) => ({
+            day: r.day,
+            bookings: r.bookings ?? 0,
+            cancellations: r.cancellations ?? 0,
+            adjusted: (r.bookings ?? 0) - (r.cancellations ?? 0),
+            kind,
         });
 
-        const backgroundCancellations = combined.map(d => {
-            if (isHistoryOnly) return 'rgba(255, 99, 132, 0.6)';
-            return d.type === 'История' ? 'rgba(255, 99, 132, 0.2)' : 'rgba(255, 99, 132, 0.6)';
-        });
+        return [
+            ...history.map(r => mapRow(r, "history")),
+            ...forecast.map(r => mapRow(r, "forecast")),
+        ];
+    }
+
+    function kindLabel(kind) {
+        if (kind === "history") return "История";
+        if (kind === "forecast") return "Прогноз";
+        return "";
+    }
+
+    function renderChart(payload) {
+        const rows = normalizeForecastData(payload);
+        if (!rows.length) {
+            alert("Нет данных для отображения");
+            return;
+        }
+
+        const ctx = document.getElementById("forecastChart").getContext("2d");
 
         if (window.chartInstance) {
             window.chartInstance.destroy();
         }
 
+        const labels = rows.map(r => r.day);
+        const bookings = rows.map(r => r.bookings);
+        const cancellations = rows.map(r => r.cancellations);
+        const adjustedDemand = rows.map(r => r.adjusted);
+
+        const horizonValue = document.getElementById("horizon").value;
+        const isHistoryOnly = horizonValue === "0";
+
+        const backgroundBookings = rows.map(r => {
+            if (isHistoryOnly) return "rgba(65,134,243,0.6)";
+            return r.kind === "history"
+                ? "rgba(65,134,243,0.25)"
+                : "rgba(65,134,243,0.7)";
+        });
+
+        const backgroundCancellations = rows.map(r => {
+            if (isHistoryOnly) return "rgba(255,99,132,0.6)";
+            return r.kind === "history"
+                ? "rgba(255,99,132,0.25)"
+                : "rgba(255,99,132,0.7)";
+        });
+
         window.chartInstance = new Chart(ctx, {
-            type: 'bar',
+            type: "bar",
             data: {
-                labels: labels,
+                labels,
                 datasets: [
                     {
-                        label: 'Бронирования',
+                        label: "Бронирования",
                         data: bookings,
                         backgroundColor: backgroundBookings,
-                        stack: 'stack1'
+                        stack: "stack1",
                     },
                     {
-                        label: 'Отмены',
+                        label: "Отмены",
                         data: cancellations,
                         backgroundColor: backgroundCancellations,
-                        stack: 'stack1'
+                        stack: "stack1",
                     },
                     {
-                        label: 'Скорректированный спрос',
+                        label: "Скорректированный спрос",
                         data: adjustedDemand,
-                        type: 'line',
-                        borderColor: 'black',
+                        type: "line",
+                        borderColor: "black",
                         borderWidth: 2,
                         pointRadius: 2,
-                        tension: 0.2,
+                        tension: 0.25,
                         fill: false,
-                        order: 99
-                    }
-                ]
+                        order: 99,
+                    },
+                ],
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 scales: {
                     x: {
                         stacked: true,
                         ticks: {
                             maxRotation: 45,
-                            minRotation: 45
-                        }
+                            minRotation: 45,
+                        },
                     },
                     y: {
                         stacked: true,
                         beginAtZero: true,
                         title: {
                             display: true,
-                            text: 'Количество'
-                        }
-                    }
+                            text: "Количество",
+                        },
+                    },
                 },
                 plugins: {
                     legend: {
-                        position: 'top'
+                        position: "top",
                     },
                     tooltip: {
-                        mode: 'index',
-                        intersect: false
-                    }
-                }
+                        mode: "index",
+                        intersect: false,
+                    },
+                },
+            },
+        });
+    }
+
+    function renderTable(payload) {
+        const rows = normalizeForecastData(payload);
+
+        if (rows.length === 0) {
+            alert("Нет данных для отображения.");
+            return;
+        }
+
+        const tbody = document.getElementById("forecastTableBody");
+        tbody.innerHTML = "";
+
+        rows.forEach(r => {
+            const tr = document.createElement("tr");
+
+            tr.innerHTML = `
+                <td>${r.day ?? ""}</td>
+                <td>${r.bookings}</td>
+                <td>${r.cancellations}</td>
+                <td>${r.adjusted}</td>
+                <td>${kindLabel(r.kind)}</td>
+            `;
+
+            tbody.appendChild(tr);
+        });
+    }
+
+    // === Event wiring ===
+    window.onload = () => {
+        setTodayToDateInput();
+
+        document.getElementById("btnLogin").addEventListener("click", login);
+        document.getElementById("btnUpload").addEventListener("click", uploadCSV);
+        document.getElementById("btnFetchForecast").addEventListener("click", fetchForecast);
+        document.getElementById("btnRender").addEventListener("click", renderForecast);
+        document.getElementById("btnLogout").addEventListener("click", logout);
+        document.getElementById("btnReloadMe").addEventListener("click", async () => {
+            try {
+                await loadMe();
+                alert("✅ Профиль обновлён.");
+            } catch (e) {
+                showErrorToUser(e._serviceError);
+                console.error(e);
             }
         });
 
-        chartCanvas.classList.remove('hidden');
-    }
-
-
-    function renderForecastTable() {
-        const tableContainer = document.getElementById('forecastTable');
-        const history = window.historyData;
-        const forecast = window.forecastData;
-
-        const combined = [...history.map(d => ({...d, type: 'История'})), ...forecast.map(d => ({...d, type: 'Прогноз'}))];
-
-        const rows = combined.map(d => {
-            const net = d.bookings - d.cancellations;
-            return `<tr>
-                <td>${d.day}</td>
-                <td>${d.type}</td>
-                <td>${d.bookings}</td>
-                <td>${d.cancellations}</td>
-                <td>${net}</td>
-            </tr>`;
-        }).join('');
-
-        tableContainer.innerHTML = `
-            <table class="table table-striped table-bordered">
-                <thead class="table-light">
-                    <tr>
-                        <th>Дата</th>
-                        <th>Источник</th>
-                        <th>Бронирования</th>
-                        <th>Отмены</th>
-                        <th>Скорректированный спрос</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${rows}
-                </tbody>
-            </table>
-        `;
-
-        tableContainer.classList.remove('hidden');
-    }
+        // Попытка автоматически восстановить сессию:
+        // если cookies уже есть, /auth/me даст 200 и мы сразу покажем основную часть.
+        (async () => {
+            try {
+                await loadMe();
+                setAuthUI(true);
+            } catch {
+                setAuthUI(false);
+            }
+        })();
+    };
 </script>
 </body>
 </html>
