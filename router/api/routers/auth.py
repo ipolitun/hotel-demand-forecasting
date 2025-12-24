@@ -43,11 +43,8 @@ async def login(
         json=data.model_dump(),
     )
 
-    response.status_code = auth_response.status_code
-    for cookie in auth_response.headers.get_list("set-cookie"):
-        response.headers.append("set-cookie", cookie)
-
-    return None
+    forward_response(source=auth_response, target=response)
+    return response
 
 
 @router.post(
@@ -66,7 +63,7 @@ async def refresh(
     )
 
     forward_response(source=auth_response, target=response)
-    return None
+    return response
 
 
 @router.post(
@@ -91,7 +88,7 @@ async def change_password(
     )
 
     forward_response(source=auth_response, target=response)
-    return None
+    return response
 
 
 @router.post(
@@ -110,7 +107,7 @@ async def logout(
     )
 
     forward_response(source=auth_response, target=response)
-    return None
+    return response
 
 
 @router.post(
@@ -135,7 +132,7 @@ async def logout_all(
     )
 
     forward_response(source=auth_response, target=response)
-    return None
+    return response
 
 
 @router.post(
@@ -146,6 +143,7 @@ async def logout_all(
 )
 @register_errors(ConflictError, ExternalServiceError)
 async def register_user(
+        response: Response,
         data: UserRegisterRequest,
         client: httpx.AsyncClient = Depends(get_http_client),
 ):
@@ -155,4 +153,17 @@ async def register_user(
         json=data.model_dump(),
     )
 
-    return auth_response.json()
+    forward_response(source=auth_response, target=response)
+    return response
+
+
+@router.get(
+    "/me",
+    summary="Текущий пользователь",
+)
+@register_errors(AuthorizationError, ExternalServiceError)
+async def get_me(
+        payload: dict = Depends(get_jwt_principal),
+):
+    # TODO: в будущем редиректить в 'auth_service/auth/me'
+    return payload

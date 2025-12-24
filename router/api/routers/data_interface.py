@@ -1,7 +1,7 @@
 import logging
 
 import httpx
-from fastapi import APIRouter, Depends, UploadFile, File, status
+from fastapi import APIRouter, Depends, UploadFile, File, status, Response
 
 from router.api.dependencies import (
     get_http_client,
@@ -13,6 +13,7 @@ from router.api.schemas import (
     BookingImportResponse,
     AccessibleHotel
 )
+from router.api.utils.http import forward_response
 from router.api.utils.http import proxy_post
 from router.config import router_config
 from shared.errors import (
@@ -42,6 +43,7 @@ router = APIRouter()
     ConflictError, DatabaseError, ExternalServiceError
 )
 async def import_bookings(
+        response: Response,
         file: UploadFile = File(...),
         hotel: AccessibleHotel = Depends(get_current_hotel),
         client: httpx.AsyncClient = Depends(get_http_client),
@@ -54,19 +56,19 @@ async def import_bookings(
     file_content = await file.read()
     files = {"file": (file.filename, file_content, file.content_type)}
 
-    response = await proxy_post(
+    import_response = await proxy_post(
         client=client,
         url=f"{router_config.data_interface_service_url}/booking/import",
         headers={"X-Hotel-Id": str(hotel.id)},
         files=files,
     )
-    result = response.json()
+    forward_response(source=import_response, target=response)
 
     logger.info(
         "Импорт завершён через router_service: hotel_id=%s",
         hotel.id,
     )
-    return result
+    return response
 
 
 @router.post(
@@ -81,6 +83,7 @@ async def import_bookings(
 )
 async def fetch_forecast(
         req: ForecastRequest,
+        response: Response,
         hotel: AccessibleHotel = Depends(get_current_hotel),
         client: httpx.AsyncClient = Depends(get_http_client),
 ):
@@ -90,17 +93,17 @@ async def fetch_forecast(
     """
     headers = {"X-Hotel-Id": str(hotel.id)}
 
-    response = await proxy_post(
+    forecast_response = await proxy_post(
         client=client,
         url=f"{router_config.data_interface_service_url}/forecast/fetch",
         headers={"X-Hotel-Id": str(hotel.id)},
-        json=req.model_dump_json(),
+        json=req.model_dump(mode="json"),
     )
-    result = response.json()
+    forward_response(source=forecast_response, target=response)
 
     logger.info(
         "Прогноз успешно получен через router_service: hotel_id=%s, horizon=%s",
         hotel.id,
         req.horizon,
     )
-    return result
+    return response

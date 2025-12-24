@@ -1,4 +1,4 @@
-from jose import jwt, ExpiredSignatureError, JWTError
+from jose import jwt, JWTError
 
 from router.api.schemas import AccessibleHotel
 from router.config import router_config
@@ -15,10 +15,8 @@ def decode_access_jwt(token: str) -> dict:
         return jwt.decode(
             token,
             router_config.jwt_config.secret_key,
-            algorithms=[router_config.jwt_config.algorithm],
+            algorithms=[router_config.jwt_config.hash_algorithm],
         )
-    except ExpiredSignatureError:
-        raise AuthorizationError("Access token expired")
     except JWTError as exc:
         raise AuthorizationError("Invalid access token") from exc
 
@@ -29,7 +27,7 @@ def validate_base_principal(payload: dict) -> dict:
 
     Проверяет наличие обязательных claims и тип токена.
     """
-    if "sub" not in payload or "role" not in payload:
+    if "sub" not in payload or "system_role" not in payload:
         raise AuthorizationError("Invalid token payload")
 
     if payload.get("token_type") != "access":
