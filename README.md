@@ -6,6 +6,7 @@ that handle data ingestion, forecasting, and API access for multiple hotels.
 
 ## Table of contents
 - [Architecture overview](#architecture-overview)
+- [Technology stack](#technology-stack)
 - [Repository layout](#repository-layout)
 - [Key features](#key-features)
 - [Getting started](#getting-started)
@@ -56,6 +57,20 @@ the frontend, and internal service-to-service interactions, exposing a structure
   identifiers and target dates as a temporary simplification.
 * **Frontend UI** — static dashboard (served by Nginx) that communicates with the router to visualize
   forecasts.
+
+## Technology stack
+
+* **Backend:** Python, FastAPI, Pydantic, uvicorn
+* **Database:** PostgreSQL
+* **Caching / storage:** Redis (refresh tokens)
+* **ORM:** SQLAlchemy
+* **Async / concurrency:** asyncio, httpx
+* **ML / forecasting:** PyTorch, pandas, NumPy, scikit-learn
+* **Containerization:** Docker, Docker Compose
+* **Frontend:** Static HTML/CSS/JS served via Nginx
+* **Migrations:** Alembic
+* **Testing:** Pytest
+
 
 ## Repository layout
 
